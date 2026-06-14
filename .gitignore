@@ -1,0 +1,39 @@
+# === Rebuild Bar 顶层 .gitignore ===
+
+# Xcode / Swift 编译产物
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# 构建产物(嵌入在子项目中)
+FreeModelMenuBar/build/
+FreeModelMenuBar/DerivedData/
+
+# macOS 系统文件
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# 编辑器/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node.js (router_sidecar.js 依赖)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+*.tmp
+*.log
+.env
+.env.local
