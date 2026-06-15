@@ -178,60 +178,9 @@ private enum AddKind { case account, codex }
                     }
                 }
             )) {
-                Section(header: accountsSectionHeader) {
-                    ForEach(accountManager.accounts) { account in
-                    if addExpanded == .account {
-                        accountsInlineAddRow
-                    }
-                        accountRow(account)
-                            .tag(SidebarItem.account(account.id))
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    pendingDeleteAccount = account
-                                } label: {
-                                    Label("删除账号", systemImage: "trash")
-                                }
-                            }
-                    }
-                }
-
-                Section(header: codexSectionHeader) {
-                    if addExpanded == .codex {
-                        codexInlineAddRow
-                    }
-                        ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
-                            codexConfigRow(cfg)
-                                .tag(SidebarItem.codexInjectionConfig(cfg.id))
-                                .contextMenu {
-                                    Button {
-                                        codexInjectionLayer.activateConfiguration(id: cfg.id)
-                                    } label: {
-                                        Label("激活", systemImage: "bolt.fill")
-                                    }
-                                    Button(role: .destructive) {
-                                        pendingDeleteCodexConfig = cfg
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                }
-                        }
-                }
-
-                Section(header: Text("运行日志")) {
-                    HStack {
-                        SidebarRow(
-                            icon: "terminal.fill",
-                            iconColor: routerStatusColor(routerManager.status) ?? .secondary,
-                            title: "运行日志",
-                            subtitle: routerStatusSubtitle,
-                            statusColor: routerStatusColor(routerManager.status),
-                            isSelected: {
-                                if case .logs = selectedItem { return true }
-                                return false
-                            }()
-                        )
-                    }
-                }
+                accountsSection
+                codexSection
+                logsSection
             }
             .listStyle(.sidebar)
         }
@@ -282,6 +231,67 @@ private enum AddKind { case account, codex }
         }
     }
 
+
+    // MARK: - 3 个侧边栏 Section（抽成独立视图避免 List 类型推断超时）
+
+    private var accountsSection: some View {
+        Section(header: accountsSectionHeader) {
+            if addExpanded == .account {
+                accountsInlineAddRow
+            }
+            ForEach(accountManager.accounts) { account in
+                accountRow(account)
+                    .tag(SidebarItem.account(account.id))
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            pendingDeleteAccount = account
+                        } label: {
+                            Label("删除账号", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+
+    private var codexSection: some View {
+        Section(header: codexSectionHeader) {
+            if addExpanded == .codex {
+                codexInlineAddRow
+            }
+            ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
+                codexConfigRow(cfg)
+                    .tag(SidebarItem.codexInjectionConfig(cfg.id))
+                    .contextMenu {
+                        Button {
+                            codexInjectionLayer.activateConfiguration(id: cfg.id)
+                        } label: {
+                            Label("激活", systemImage: "bolt.fill")
+                        }
+                        Button(role: .destructive) {
+                            pendingDeleteCodexConfig = cfg
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+
+    private var logsSection: some View {
+        Section(header: Text("运行日志")) {
+            SidebarRow(
+                icon: "terminal.fill",
+                iconColor: routerStatusColor(routerManager.status) ?? .secondary,
+                title: "运行日志",
+                subtitle: routerStatusSubtitle,
+                statusColor: routerStatusColor(routerManager.status),
+                isSelected: {
+                    if case .logs = selectedItem { return true }
+                    return false
+                }()
+            )
+        }
+    }
 
     // MARK: - 账号 section 标题（与 Codex 注入同形状：label + 右侧 +）
 
