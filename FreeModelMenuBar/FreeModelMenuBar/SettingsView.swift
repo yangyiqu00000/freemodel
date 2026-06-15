@@ -191,10 +191,10 @@ private enum AddKind { case account, codex }
                     HStack {
                         SidebarRow(
                             icon: "terminal.fill",
-                            iconColor: routerManager.status == .running ? .green : .secondary,
+                            iconColor: routerStatusColor(routerManager.status) ?? .secondary,
                             title: "运行日志",
                             subtitle: routerStatusSubtitle,
-                            statusColor: routerManager.status == .running ? .green : nil
+                            statusColor: routerStatusColor(routerManager.status)
                         )
                     }
                 }
@@ -489,12 +489,7 @@ private enum AddKind { case account, codex }
     }
 
     private var headerStatusDot: Color? {
-        switch routerManager.status {
-        case .running: return .green
-        case .starting: return .orange
-        case .failed, .portInUse, .missingKey: return .red
-        case .off: return nil
-        }
+        routerStatusColor(routerManager.status)
     }
 
     private var emptyState: some View {
@@ -959,16 +954,7 @@ private enum AddKind { case account, codex }
     // MARK: - Router Section
 
     private func statusBadge(_ status: RouterStatus) -> some View {
-        let color: Color
-        switch status {
-        case .off: color = .gray
-        case .starting: color = .orange
-        case .running: color = .green
-        case .failed: color = .red
-        case .portInUse: color = .red
-        case .missingKey: color = .red
-        }
-
+        let color = routerStatusColor(status) ?? .gray
         return Text(status.rawValue)
             .font(.caption2)
             .fontWeight(.bold)
@@ -977,7 +963,6 @@ private enum AddKind { case account, codex }
             .foregroundStyle(.white)
             .background(RoundedRectangle(cornerRadius: 4).fill(color))
     }
-
     private func logRowView(_ log: RouterLogEntry) -> some View {
         let color: Color
         if log.method == "SYS" || log.method == "INFO" {
@@ -1401,6 +1386,17 @@ private enum AddKind { case account, codex }
         case .failed: return "路由启动失败"
         case .portInUse: return "端口被占用"
         case .missingKey: return "缺少 API Key"
+        }
+    }
+
+    // MARK: - 路由状态颜色（顶栏 / 详情区 / 日志行 共用单一来源）
+
+    private func routerStatusColor(_ status: RouterStatus) -> Color? {
+        switch status {
+        case .running: return .green
+        case .starting: return .orange
+        case .failed, .portInUse, .missingKey: return .red
+        case .off: return nil
         }
     }
 }
