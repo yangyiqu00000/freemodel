@@ -222,14 +222,14 @@ struct CodexInjectionSettingsView: View {
             .disabled(isActive)
             .help(isActive ? "当前已是激活状态" : "把当前编辑的 auth.json + config.toml 写入 ~/.codex/")
 
-            Button(role: .destructive) {
+            Button {
                 appLayer.deactivate()
             } label: {
                 Label("恢复默认（清空 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .tint(.orange)
+            .tint(.gray)
             .disabled(!isActive)
             .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
         }

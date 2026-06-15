@@ -682,6 +682,13 @@ private enum AddKind { case account, codex }
                     Image(systemName: showAPIKey ? "eye.slash" : "eye")
                 }
                 .buttonStyle(.borderless)
+                .disabled(isTesting)
+
+                if isTesting {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .help("正在测试连接")
+                }
             }
 
             HStack(spacing: 12) {
@@ -708,16 +715,6 @@ private enum AddKind { case account, codex }
                     testResultMessage = "已清除当前账号的 API Key"
                 }
                 .buttonStyle(.bordered)
-            }
-
-            if isTesting {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("正在测试连接...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             if showTestResult {
@@ -868,7 +865,9 @@ private enum AddKind { case account, codex }
             Picker("查询模式", selection: Binding(
                 get: { account.queryMode },
                 set: { newValue in
-                    accountManager.updateQueryMode(newValue, for: account.id)
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        accountManager.updateQueryMode(newValue, for: account.id)
+                    }
                 }
             )) {
                 ForEach(QueryMode.allCases, id: \.self) { mode in
@@ -876,16 +875,21 @@ private enum AddKind { case account, codex }
                 }
             }
             .pickerStyle(.segmented)
-            
-            if account.queryMode == .dashboard {
-                Text("网页控制台模式：通过内置网页登录 FreeModel 并截获其会话 Cookie 刷新余额。这是最推荐、最稳定的方式。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("API Key 模式：直接请求 OpenAI 兼容的余额接口进行额度获取。支持自定义 API Base URL。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+            ZStack(alignment: .topLeading) {
+                if account.queryMode == .dashboard {
+                    Text("网页控制台模式：通过内置网页登录 FreeModel 并截获其会话 Cookie 刷新余额。这是最推荐、最稳定的方式。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                } else {
+                    Text("API Key 模式：直接请求 OpenAI 兼容的余额接口进行额度获取。支持自定义 API Base URL。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.18), value: account.queryMode)
         }
         .sectionPanel()
     }
@@ -1321,26 +1325,40 @@ private enum AddKind { case account, codex }
                 }
             }
 
-            // 单行：活动账号 · 监听 · 上游
+            // 三段式：账号 / 监听 / 上游（每段独立换行不重叠）
             if let activeAccount = accountManager.activeAccount {
                 let settings = activeAccount.activeRouterSettings
-                HStack(spacing: 6) {
-                    Text("账号：")
-                        .foregroundStyle(.secondary)
-                    Text(activeAccount.displayName)
-                        .fontWeight(.semibold)
-                    if settings.enabled && routerManager.status == .running {
-                        Text("·").foregroundStyle(.secondary)
-                        Text("监听").foregroundStyle(.secondary)
-                        Text("http://127.0.0.1:\(settings.port)/v1")
-                            .font(.system(.caption, design: .monospaced))
-                        Text("·").foregroundStyle(.secondary)
-                        Text("上游").foregroundStyle(.secondary)
-                        Text(settings.upstreamBaseURL)
-                            .font(.system(.caption, design: .monospaced))
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("账号")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(activeAccount.displayName)
+                            .fontWeight(.semibold)
                             .lineLimit(1)
-                            .truncationMode(.middle)
+                            .truncationMode(.tail)
                     }
+                    if settings.enabled && routerManager.status == .running {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("监听")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("http://127.0.0.1:\(settings.port)/v1")
+                                .font(.system(.caption, design: .monospaced))
+                                .textSelection(.enabled)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("上游")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(settings.upstreamBaseURL)
+                                .font(.system(.caption, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    Spacer()
                 }
                 .font(.caption)
             } else {
