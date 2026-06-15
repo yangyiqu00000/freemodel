@@ -14,13 +14,19 @@ struct MenuContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏
-            HStack {
+            // 标题栏：图标 + 标题 + 副标题（账号 / Codex 注入统计）
+            HStack(alignment: .center, spacing: 8) {
                 Image(systemName: "dollarsign.circle.fill")
                     .font(.title2)
                     .foregroundStyle(.blue)
-                Text("FreeModel")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("FreeModel")
+                        .font(.headline)
+                    Text(headerSubtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 Spacer()
                 if let activeAccount = accountManager.activeAccount {
                     Text(activeAccount.displayName)
@@ -117,6 +123,14 @@ struct MenuContent: View {
             .padding(.vertical, 12)
         }
         .frame(width: 320)
+    }
+
+    // MARK: - 标题栏副标题
+
+    private var headerSubtitle: String {
+        let accountCount = accountManager.accounts.count
+        let accountPart = accountCount == 0 ? "无账号" : "\(accountCount) 个账号"
+        return "v1 · \(accountPart)"
     }
 
     // MARK: - 子视图
