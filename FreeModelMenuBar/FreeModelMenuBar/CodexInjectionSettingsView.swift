@@ -230,6 +230,7 @@ struct CodexInjectionSettingsView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
             .tint(.green)
             .disabled(isActive)
             .help(isActive ? "当前已是激活状态" : "把当前编辑的 auth.json + config.toml 写入 ~/.codex/")
@@ -241,6 +242,7 @@ struct CodexInjectionSettingsView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .controlSize(.regular)
             .tint(.gray)
             .disabled(!isActive)
             .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
@@ -252,8 +254,9 @@ struct CodexInjectionSettingsView: View {
                 Label("删除", systemImage: "trash")
             }
             .buttonStyle(.bordered)
+            .controlSize(.regular)
             .tint(.red)
-            .frame(width: 90)
+            .frame(width: 100)
             .help("删除本条注入配置（清空编辑中的 auth.json + config.toml）")
         }
     }
