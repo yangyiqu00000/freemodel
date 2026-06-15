@@ -195,7 +195,11 @@ private enum AddKind { case account, codex }
                             iconColor: routerStatusColor(routerManager.status) ?? .secondary,
                             title: "运行日志",
                             subtitle: routerStatusSubtitle,
-                            statusColor: routerStatusColor(routerManager.status)
+                            statusColor: routerStatusColor(routerManager.status),
+                            isSelected: {
+                                if case .logs = selectedItem { return true }
+                                return false
+                            }()
                         )
                     }
                 }
@@ -416,19 +420,22 @@ private enum AddKind { case account, codex }
         let subtitle: String?
         let statusColor: Color?
         let subtitleColor: Color
+        var isSelected: Bool = false
 
         init(icon: String,
              iconColor: Color = .secondary,
              title: String,
              subtitle: String? = nil,
              statusColor: Color? = nil,
-             subtitleColor: Color = .secondary) {
+             subtitleColor: Color = .secondary,
+             isSelected: Bool = false) {
             self.icon = icon
             self.iconColor = iconColor
             self.title = title
             self.subtitle = subtitle
             self.statusColor = statusColor
             self.subtitleColor = subtitleColor
+            self.isSelected = isSelected
         }
 
         var body: some View {
@@ -455,18 +462,31 @@ private enum AddKind { case account, codex }
                 }
             }
             .padding(.vertical, 3)
+            .padding(.horizontal, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
     }
     // MARK: - 单条注入配置行
 
     private func codexConfigRow(_ cfg: InjectionConfiguration) -> some View {
         let isActive = (codexInjectionLayer.activeInjection?.configurationID == cfg.id)
+        let isSelected: Bool = {
+            if case .codexInjectionConfig(let selectedID) = selectedItem, selectedID == cfg.id {
+                return true
+            }
+            return false
+        }()
         return SidebarRow(
             icon: isActive ? "checkmark.circle.fill" : "circle",
             iconColor: isActive ? .green : .secondary,
             title: cfg.label,
             subtitle: "\(cfg.kind == .official ? "官方" : "第三方") · \(cfg.providerID)",
-            statusColor: isActive ? .green : nil
+            statusColor: isActive ? .green : nil,
+            isSelected: isSelected
         )
     }
 
@@ -514,8 +534,16 @@ private enum AddKind { case account, codex }
             icon: account.hasDashboardSession ? "checkmark.circle.fill" : "person.crop.circle",
             iconColor: account.hasDashboardSession ? .green : .secondary,
             title: account.displayName,
-            subtitle: accountStatusText(account)
+            subtitle: accountStatusText(account),
+            isSelected: isAccountSelected(account.id)
         )
+    }
+
+    private func isAccountSelected(_ id: UUID) -> Bool {
+        if case .account(let selectedID) = selectedItem, selectedID == id {
+            return true
+        }
+        return false
     }
 
     private var header: some View {
@@ -725,6 +753,8 @@ private enum AddKind { case account, codex }
                         .font(.caption)
                         .foregroundStyle(testResultSuccess ? .green : .red)
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.2), value: testResultMessage)
             }
         }
         .sectionPanel()
