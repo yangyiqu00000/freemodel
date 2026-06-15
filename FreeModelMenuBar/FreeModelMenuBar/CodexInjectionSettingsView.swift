@@ -6,7 +6,7 @@
 //  不再有 sheet / popover / DisclosureGroup / swipeActions。
 //  顶部：标签 + Provider 两个文本框；右上角绿色「激活」/ 灰底「已激活 ✓」按钮。
 //  中间：auth.json + config.toml 两个自适应高度编辑框（官方配置在 auth.json 上方提供抓取链接）。
-//  底部：「停用该注入」（= 删 ~/.codex/auth.json + config.toml）。
+//  底部：「恢复默认」按钮：清空 ~/.codex/auth.json + config.toml，回到初始 Codex 状态。
 //
 
 import SwiftUI
@@ -185,13 +185,13 @@ struct CodexInjectionSettingsView: View {
             Button(role: .destructive) {
                 appLayer.deactivate()
             } label: {
-                Label("停用该注入（清空 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
+                Label("恢复默认（清空 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .tint(.orange)
             .disabled(!isActive)
-            .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需停用")
+            .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
         }
     }
 }

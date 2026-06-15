@@ -41,6 +41,14 @@ private enum AddKind { case account, codex }
     @State private var newCodexLabel: String = ""
     @State private var newCodexProvider: String = ""
 
+    // 删除确认
+    @State private var pendingDeleteAccount: ProviderAccount? = nil
+    @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
+
+    // 日志清除 toast
+    @State private var logsClearedToast: String? = nil
+    @State private var logsClearedToastToken: Int = 0
+
     // Router State
     @State private var routerEnabled: Bool = false
     @State private var routerPort: String = "38440"
@@ -150,11 +158,7 @@ private enum AddKind { case account, codex }
                             .tag(SidebarItem.account(account.id))
                             .contextMenu {
                                 Button(role: .destructive) {
-                                    _ = accountManager.deleteAccount(id: account.id)
-                                    balanceManager.syncFromActiveAccount()
-                                    if case .account(let id) = selectedItem, id == account.id {
-                                        selectedItem = nil
-                                    }
+                                    pendingDeleteAccount = account
                                 } label: {
                                     Label("删除账号", systemImage: "trash")
                                 }
@@ -176,10 +180,7 @@ private enum AddKind { case account, codex }
                                         Label("激活", systemImage: "bolt.fill")
                                     }
                                     Button(role: .destructive) {
-                                        codexInjectionLayer.deleteConfiguration(id: cfg.id)
-                                        if case .codexInjectionConfig(let id) = selectedItem, id == cfg.id {
-                                            selectedItem = nil
-                                        }
+                                        pendingDeleteCodexConfig = cfg
                                     } label: {
                                         Label("删除", systemImage: "trash")
                                     }
@@ -200,6 +201,51 @@ private enum AddKind { case account, codex }
                 }
             }
             .listStyle(.sidebar)
+        }
+        .confirmationDialog(
+            "确定删除账号 “\(pendingDeleteAccount?.displayName ?? "")” ？",
+            isPresented: Binding(
+                get: { pendingDeleteAccount != nil },
+                set: { if !$0 { pendingDeleteAccount = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeleteAccount
+        ) { acct in
+            Button("删除 “\(acct.displayName)”", role: .destructive) {
+                _ = accountManager.deleteAccount(id: acct.id)
+                balanceManager.syncFromActiveAccount()
+                if case .account(let id) = selectedItem, id == acct.id {
+                    selectedItem = nil
+                }
+                pendingDeleteAccount = nil
+            }
+            Button("取消", role: .cancel) {
+                pendingDeleteAccount = nil
+            }
+        } message: { _ in
+            Text("该账号的 API Key、控制台登录态与本地缓存余额将一并清除。此操作不可撤销。")
+        }
+        .confirmationDialog(
+            "确定删除注入配置 “\(pendingDeleteCodexConfig?.label ?? "")” ？",
+            isPresented: Binding(
+                get: { pendingDeleteCodexConfig != nil },
+                set: { if !$0 { pendingDeleteCodexConfig = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeleteCodexConfig
+        ) { cfg in
+            Button("删除 “\(cfg.label)”", role: .destructive) {
+                codexInjectionLayer.deleteConfiguration(id: cfg.id)
+                if case .codexInjectionConfig(let id) = selectedItem, id == cfg.id {
+                    selectedItem = nil
+                }
+                pendingDeleteCodexConfig = nil
+            }
+            Button("取消", role: .cancel) {
+                pendingDeleteCodexConfig = nil
+            }
+        } message: { _ in
+            Text("将清除本条注入的 auth.json 与 config.toml 编辑内容；已激活的注入将被先恢复默认。此操作不可撤销。")
         }
     }
 
@@ -435,6 +481,11 @@ private enum AddKind { case account, codex }
         routerFailoverEnabled = s.isFailoverEnabled
         routerMaxConcurrency = String(s.maxConcurrency ?? 0)
         routerMinIntervalMs = String(s.minIntervalMs ?? 0)
+
+        // 切到不同账号时，重置 API Key 测试结果 banner（避免上一个账号的提示泄漏）
+        showTestResult = false
+        testResultMessage = ""
+        testResultSuccess = false
 	    }
 
     private func accountRow(_ account: ProviderAccount) -> some View {
@@ -770,18 +821,18 @@ private enum AddKind { case account, codex }
     }
 
     private func accountStatusText(_ account: ProviderAccount) -> String {
+        // 统一格式：有余额 = "余额 · 状态"；无余额 = "状态"
         let status: String
         switch account.queryMode {
         case .dashboard:
-            status = account.hasDashboardSession ? "已登录" : "未登录"
+            status = account.hasDashboardSession ? "控制台已登录" : "控制台未登录"
         case .apiKey:
             status = account.hasAPIKey ? "已设 Key" : "未设 Key"
         }
-        
         if let balance = account.lastBalance {
             return "\(balance.remainingFormatted) · \(status)"
         }
-        return account.queryMode == .dashboard ? "\(status)控制台" : status
+        return status
     }
 
     private func queryModeSection(_ account: ProviderAccount) -> some View {
@@ -953,16 +1004,6 @@ private enum AddKind { case account, codex }
 
     // MARK: - Router Section
 
-    private func statusBadge(_ status: RouterStatus) -> some View {
-        let color = routerStatusColor(status) ?? .gray
-        return Text(status.rawValue)
-            .font(.caption2)
-            .fontWeight(.bold)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .foregroundStyle(.white)
-            .background(RoundedRectangle(cornerRadius: 4).fill(color))
-    }
     private func logRowView(_ log: RouterLogEntry) -> some View {
         let color: Color
         if log.method == "SYS" || log.method == "INFO" {
@@ -1025,7 +1066,16 @@ private enum AddKind { case account, codex }
                 Label("本地 Responses 路由代理", systemImage: "arrow.triangle.2.circlepath.circle")
                     .font(.headline)
                 Spacer()
-                statusBadge(routerManager.status)
+                HStack(spacing: 6) {
+                    Text(routerStatusSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let dot = headerStatusDot {
+                        Circle()
+                            .fill(dot)
+                            .frame(width: 6, height: 6)
+                    }
+                }
             }
 
             Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。")
@@ -1053,18 +1103,6 @@ private enum AddKind { case account, codex }
                 }
                 
                 Spacer()
-                
-                if routerManager.status == .running {
-                    Button(action: {
-                        NSPasteboard.general.clearContents()
-                        let portVal = Int(routerPort) ?? 38440
-                        NSPasteboard.general.setString("http://127.0.0.1:\(portVal)/v1", forType: .string)
-                    }) {
-                        Label("复制 Base URL", systemImage: "doc.on.doc")
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                }
             }
             .padding(.vertical, 4)
 
@@ -1204,100 +1242,94 @@ private enum AddKind { case account, codex }
     // MARK: - Global Logs Console Views & Actions
 
     private var logsHeader: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "terminal.fill")
-                .font(.title2)
-                .foregroundStyle(.green)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("路由代理运行日志")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "terminal.fill")
                     .font(.title2)
-                    .fontWeight(.bold)
-                HStack(spacing: 6) {
-                    Text(routerStatusSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let dot = headerStatusDot {
-                        Circle()
-                            .fill(dot)
-                            .frame(width: 6, height: 6)
+                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("路由代理运行日志")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    HStack(spacing: 6) {
+                        Text(routerStatusSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let dot = headerStatusDot {
+                            Circle()
+                                .fill(dot)
+                                .frame(width: 6, height: 6)
+                        }
                     }
                 }
+                Spacer()
+                if routerManager.status == .running, let activeAccount = accountManager.activeAccount {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        let portVal = activeAccount.activeRouterSettings.port
+                        NSPasteboard.general.setString("http://127.0.0.1:\(portVal)/v1", forType: .string)
+                    }) {
+                        Label("复制 Base URL", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
-            Spacer()
+
+            // 单行：活动账号 · 监听 · 上游
+            if let activeAccount = accountManager.activeAccount {
+                let settings = activeAccount.activeRouterSettings
+                HStack(spacing: 6) {
+                    Text("账号：")
+                        .foregroundStyle(.secondary)
+                    Text(activeAccount.displayName)
+                        .fontWeight(.semibold)
+                    if settings.enabled && routerManager.status == .running {
+                        Text("·").foregroundStyle(.secondary)
+                        Text("监听").foregroundStyle(.secondary)
+                        Text("http://127.0.0.1:\(settings.port)/v1")
+                            .font(.system(.caption, design: .monospaced))
+                        Text("·").foregroundStyle(.secondary)
+                        Text("上游").foregroundStyle(.secondary)
+                        Text(settings.upstreamBaseURL)
+                            .font(.system(.caption, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .font(.caption)
+            } else {
+                Text("请先添加并激活一个账号以配置和启动路由。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private var logsConsoleSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // State summary panel
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("运行状态", systemImage: "info.circle.fill")
-                        .font(.headline)
-                    Spacer()
-                    statusBadge(routerManager.status)
+            // 日志控制：复制 / 清除
+            HStack(spacing: 12) {
+                Button(action: copyAllLogs) {
+                    Label("复制所有日志", systemImage: "doc.on.doc.fill")
                 }
+                .buttonStyle(.bordered)
+                .disabled(routerManager.logs.isEmpty)
 
-                if let activeAccount = accountManager.activeAccount {
-                    let settings = activeAccount.activeRouterSettings
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("活动账号:")
-                                .foregroundStyle(.secondary)
-                            Text(activeAccount.displayName)
-                                .fontWeight(.semibold)
-                        }
-                        if settings.enabled && routerManager.status == .running {
-                            HStack {
-                                Text("本地监听:")
-                                    .foregroundStyle(.secondary)
-                                Text("http://127.0.0.1:\(settings.port)/v1")
-                                    .font(.system(.caption, design: .monospaced))
-                            }
-                            HStack {
-                                Text("上游接口:")
-                                    .foregroundStyle(.secondary)
-                                Text(settings.upstreamBaseURL)
-                                    .font(.system(.caption, design: .monospaced))
-                            }
-                        }
-                    }
-                    .font(.caption)
-                } else {
-                    Text("请先添加并激活一个账号以配置和启动路由。")
+                Button(action: clearLogsWithToast) {
+                    Label("清除日志", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .disabled(routerManager.logs.isEmpty)
+
+                if let toast = logsClearedToast {
+                    Text(toast)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .transition(.opacity)
                 }
-
-                HStack(spacing: 12) {
-                    if routerManager.status == .running, let activeAccount = accountManager.activeAccount {
-                        Button(action: {
-                            NSPasteboard.general.clearContents()
-                            let portVal = activeAccount.activeRouterSettings.port
-                            NSPasteboard.general.setString("http://127.0.0.1:\(portVal)/v1", forType: .string)
-                        }) {
-                            Label("复制 Base URL", systemImage: "doc.on.doc")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    Button(action: copyAllLogs) {
-                        Label("复制所有日志", systemImage: "doc.on.doc.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(routerManager.logs.isEmpty)
-
-                    Button(action: {
-                        routerManager.logs.removeAll()
-                    }) {
-                        Label("清除日志", systemImage: "trash")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(routerManager.logs.isEmpty)
-                }
-                .padding(.top, 4)
+                Spacer()
             }
-            .sectionPanel()
 
             // Console terminal container
             VStack(alignment: .leading, spacing: 6) {
@@ -1355,6 +1387,25 @@ private enum AddKind { case account, codex }
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func clearLogsWithToast() {
+        let count = routerManager.logs.count
+        routerManager.logs.removeAll()
+        if count == 0 {
+            logsClearedToast = "当前无日志"
+        } else {
+            logsClearedToast = "已清除 \(count) 条日志"
+            // 3 秒后自动隐藏
+            logsClearedToastToken &+= 1
+            let token = logsClearedToastToken
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if logsClearedToastToken == token {
+                    withAnimation { logsClearedToast = nil }
+                }
+            }
+        }
     }
 
     private func copyAllLogs() {
