@@ -672,13 +672,23 @@ private enum AddKind { case account, codex }
             }
 
             if let balance = account.lastBalance {
-                HStack {
-                    Text("上次余额")
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        if balance.isLow {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .help("剩余额度不足 5.0")
+                        }
+                        Text("上次余额")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(balance.remainingFormatted)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(balance.isLow ? .orange : .green)
+                    }
+                    Text("已用 \(balance.usedFormatted) / 总额 \(balance.totalFormatted) (\(String(format: "%.0f", balance.usagePercentage))%)")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(balance.remainingFormatted)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(balance.isLow ? .orange : .green)
                 }
                 .font(.caption)
             }
@@ -1137,7 +1147,7 @@ private enum AddKind { case account, codex }
                 }
             }
 
-            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。带 * 的字段不能为空。")
+            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -1167,6 +1177,18 @@ private enum AddKind { case account, codex }
 
             if routerEnabled {
                 VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("带")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("*")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                        Text("的字段不能为空。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
                     HStack(spacing: 8) {
                         Text("上游预设:")
                             .font(.caption)
