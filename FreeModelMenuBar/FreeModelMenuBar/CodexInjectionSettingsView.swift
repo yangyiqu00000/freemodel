@@ -20,6 +20,9 @@ struct CodexInjectionSettingsView: View {
     @State private var initialProviderID: String = ""
     @State private var didCaptureInitial: Bool = false
 
+    // "已自动保存" 反馈：用户改任意字段立即更新，下次变更覆盖
+    @State private var autoSavedAt: Date? = nil
+
     var body: some View {
         if let cfg = currentConfig {
             VStack(alignment: .leading, spacing: 16) {
@@ -38,6 +41,10 @@ struct CodexInjectionSettingsView: View {
                     didCaptureInitial = true
                 }
             }
+            .onChange(of: cfg.label) { _ in triggerAutoSaveToast() }
+            .onChange(of: cfg.providerID) { _ in triggerAutoSaveToast() }
+            .onChange(of: cfg.authJSON) { _ in triggerAutoSaveToast() }
+            .onChange(of: cfg.configTOML) { _ in triggerAutoSaveToast() }
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: "questionmark.circle")
@@ -68,6 +75,10 @@ struct CodexInjectionSettingsView: View {
             Text(cfg.label).font(.title3).foregroundStyle(.secondary)
             Spacer()
             activeStatusBadge(cfg)
+            if let savedAt = autoSavedAt {
+                Spacer().frame(width: 8)
+                autoSavedBadge(at: savedAt)
+            }
         }
     }
 
@@ -264,4 +275,33 @@ struct AutoResizingTextEditor: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
+
+    // MARK: - "已自动保存" 反馈辅助
+
+    private static let autoSavedTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    @MainActor
+    private func triggerAutoSaveToast() {
+        autoSavedAt = Date()
+    }
+
+    @MainActor
+    private func autoSavedBadge(at date: Date) -> some View {
+        Label("已自动保存 · \(Self.autoSavedTimeFormatter.string(from: date))",
+            systemImage: "checkmark.seal.fill")
+            .font(.caption)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.blue.opacity(0.12))
+            )
+            .foregroundStyle(.blue)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
+    }
+
 }
