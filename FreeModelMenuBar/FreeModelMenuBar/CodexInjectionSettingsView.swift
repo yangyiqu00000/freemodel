@@ -14,6 +14,7 @@ import SwiftUI
 struct CodexInjectionSettingsView: View {
     @ObservedObject var appLayer: AppLayer
     let configurationID: String
+    @Binding var pendingDeleteCodexConfig: InjectionConfiguration?
 
     // 进入详情页时的"创建时" label / providerID（用于 undo 按钮）
     @State private var initialLabel: String = ""
@@ -243,6 +244,17 @@ struct CodexInjectionSettingsView: View {
             .tint(.gray)
             .disabled(!isActive)
             .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
+
+            // 删除按钮（不依赖 contextMenu）：触发父层 confirmationDialog
+            Button(role: .destructive) {
+                pendingDeleteCodexConfig = cfg
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .frame(width: 90)
+            .help("删除本条注入配置（清空编辑中的 auth.json + config.toml）")
         }
     }
 

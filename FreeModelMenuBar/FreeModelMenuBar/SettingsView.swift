@@ -187,7 +187,11 @@ private enum AddKind { case account, codex }
                             logsHeader
                             logsConsoleSection
                         case .codexInjectionConfig(let cfgID):
-                            CodexInjectionSettingsView(appLayer: codexInjectionLayer, configurationID: cfgID)
+                            CodexInjectionSettingsView(
+                                appLayer: codexInjectionLayer,
+                                configurationID: cfgID,
+                                pendingDeleteCodexConfig: $pendingDeleteCodexConfig
+                            )
                         }
                     } else {
                         emptyState
