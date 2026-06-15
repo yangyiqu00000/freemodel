@@ -445,12 +445,19 @@ struct SettingsView: View {
             HStack {
                 TextField("账号名称", text: $renameText)
                     .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: .infinity)
+                    .onSubmit {
+                        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        accountManager.renameAccount(id: account.id, displayName: trimmed)
+                    }
                 Button("重命名") {
-                    accountManager.renameAccount(id: account.id, displayName: renameText)
+                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    accountManager.renameAccount(id: account.id, displayName: trimmed)
                 }
                 .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-
 	            HStack(spacing: 8) {
 	                let platformName = providerName(account)
 	                tag("平台: \(platformName)", systemImage: "server.rack")

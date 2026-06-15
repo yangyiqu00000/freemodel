@@ -55,36 +55,33 @@ struct CodexInjectionSettingsView: View {
             Text("·").foregroundStyle(.secondary)
             Text(cfg.label).font(.title3).foregroundStyle(.secondary)
             Spacer()
-            activateButton(cfg)
+            activeStatusBadge(cfg)
         }
     }
 
     @ViewBuilder
-    private func activateButton(_ cfg: InjectionConfiguration) -> some View {
+    private func activeStatusBadge(_ cfg: InjectionConfiguration) -> some View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
         if isActive {
-            HStack(spacing: 8) {
-                Label("已激活", systemImage: "checkmark.circle.fill")
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.gray.opacity(0.2))
-                    )
-                    .foregroundStyle(.green)
-            }
+            Label("已激活", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.green.opacity(0.15))
+                )
+                .foregroundStyle(.green)
         } else {
-            Button {
-                appLayer.activateConfiguration(id: cfg.id)
-            } label: {
-                Label("激活", systemImage: "bolt.fill")
-                    .frame(minWidth: 80)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.green)
+            Label("未激活", systemImage: "circle.dashed")
+                .font(.caption)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.15))
+                )
+                .foregroundStyle(.secondary)
         }
     }
-
-    // MARK: - 标签 + Provider
 
     private func labelsAndProvider(_ cfg: InjectionConfiguration) -> some View {
         HStack(alignment: .center, spacing: 12) {
@@ -174,19 +171,30 @@ struct CodexInjectionSettingsView: View {
     private func bottomActions(_ cfg: InjectionConfiguration) -> some View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
         return HStack(spacing: 12) {
+            Button {
+                appLayer.activateConfiguration(id: cfg.id)
+            } label: {
+                Label("激活此配置", systemImage: "bolt.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .disabled(isActive)
+            .help(isActive ? "当前已是激活状态" : "把当前编辑的 auth.json + config.toml 写入 ~/.codex/")
+
             Button(role: .destructive) {
                 appLayer.deactivate()
             } label: {
-                Label("停用该注入（删除 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
+                Label("停用该注入（清空 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .tint(.orange)
             .disabled(!isActive)
+            .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需停用")
         }
     }
 }
-
 // MARK: - 自适应高度 TextEditor
 
 struct AutoResizingTextEditor: View {
