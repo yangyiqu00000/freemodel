@@ -38,6 +38,57 @@ private enum AddKind { case account, codex }
     }
     @State private var apiKeyStatus: ApiKeyStatus = .empty
 
+    // Provider 预设（4 个，统一入口，1 次点击设齐 URL+QueryMode+Router+RouteModel+Streaming+Failover）
+    private enum ProviderPreset: String, CaseIterable, Identifiable {
+        case freeModel = "FreeModel"
+        case deepseek = "DeepSeek"
+        case openRouter = "OpenRouter"
+        case modelScope = "ModelScope"
+        var id: String { rawValue }
+
+        struct Config {
+            let apiURL: String
+            let dashboardURL: String
+            let queryMode: QueryMode
+            let routerUpstream: String
+            let defaultModel: String
+            let routeModel: String
+        }
+
+        var config: Config {
+            switch self {
+            case .freeModel:
+                return .init(apiURL: "https://api.freemodel.dev",
+                             dashboardURL: "https://freemodel.dev",
+                             queryMode: .dashboard,
+                             routerUpstream: "https://api.freemodel.dev/v1",
+                             defaultModel: "codex-mini",
+                             routeModel: "codex-mini")
+            case .deepseek:
+                return .init(apiURL: "https://api.deepseek.com",
+                             dashboardURL: "https://platform.deepseek.com",
+                             queryMode: .apiKey,
+                             routerUpstream: "https://api.deepseek.com/v1",
+                             defaultModel: "deepseek-chat",
+                             routeModel: "codex-mini")
+            case .openRouter:
+                return .init(apiURL: "https://openrouter.ai/api/v1",
+                             dashboardURL: "https://openrouter.ai",
+                             queryMode: .apiKey,
+                             routerUpstream: "https://openrouter.ai/api/v1",
+                             defaultModel: "deepseek/deepseek-v4-flash:free",
+                             routeModel: "codex-mini")
+            case .modelScope:
+                return .init(apiURL: "https://api-inference.modelscope.cn",
+                             dashboardURL: "https://modelscope.cn",
+                             queryMode: .apiKey,
+                             routerUpstream: "https://api-inference.modelscope.cn/v1",
+                             defaultModel: "ZhipuAI/GLM-5.1",
+                             routeModel: "codex-mini")
+            }
+        }
+    }
+
     // 自定义 URL / 预设切换反馈（原本借用 apiKeySection 的 showTestResult，跨区段渲染看不到）
     private struct UrlPresetStatus: Equatable {
         let success: Bool
@@ -998,60 +1049,10 @@ private enum AddKind { case account, codex }
             Label("自定义服务器地址", systemImage: "network")
                 .font(.headline)
 
-            HStack(spacing: 8) {
-                Text("常用预设:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-	                Button("FreeModel") {
-	                    apiURLInput = "https://api.freemodel.dev"
-	                    dashboardURLInput = "https://freemodel.dev"
-	                    accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-	                    accountManager.updateQueryMode(.dashboard, for: account.id)
-	                    applyRouterPreset(for: account.id, upstreamURL: "https://api.freemodel.dev/v1", defaultModel: "codex-mini")
-	                    loadFieldsFromActiveAccount()
-	                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 FreeModel 预设地址")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                
-	                Button("DeepSeek") {
-	                    apiURLInput = "https://api.deepseek.com"
-	                    dashboardURLInput = "https://platform.deepseek.com"
-	                    accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-	                    accountManager.updateQueryMode(.apiKey, for: account.id)
-	                    applyRouterPreset(for: account.id, upstreamURL: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat")
-	                    loadFieldsFromActiveAccount()
-	                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 DeepSeek 预设地址")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-
-                Button("OpenRouter") {
-                    apiURLInput = "https://openrouter.ai/api/v1"
-                    dashboardURLInput = "https://openrouter.ai"
-                    accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-                    accountManager.updateQueryMode(.apiKey, for: account.id)
-                    applyRouterPreset(for: account.id, upstreamURL: "https://openrouter.ai/api/v1", defaultModel: "deepseek/deepseek-v4-flash:free")
-                    loadFieldsFromActiveAccount()
-                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 OpenRouter 预设地址")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Button("ModelScope") {
-                    apiURLInput = "https://api-inference.modelscope.cn"
-                    dashboardURLInput = "https://modelscope.cn"
-                    accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-                    accountManager.updateQueryMode(.apiKey, for: account.id)
-                    applyRouterPreset(for: account.id, upstreamURL: "https://api-inference.modelscope.cn/v1", defaultModel: "ZhipuAI/GLM-5.1")
-                    loadFieldsFromActiveAccount()
-                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 ModelScope 预设地址")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
+            Text("要快速切换 provider（URL + 查询模式 + 路由 + 默认模型 一次性设齐）？请到下方「路由」段顶部选择预设。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
             .padding(.bottom, 4)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -1099,6 +1100,27 @@ private enum AddKind { case account, codex }
 	        }
 	        return "FreeModel"
 	    }
+
+
+    // MARK: - 统一 provider 预设入口（1 次点击设齐 6 个字段）
+
+    private func applyProviderPreset(_ preset: ProviderPreset, for account: ProviderAccount) {
+        let cfg = preset.config
+        // 写账号层
+        accountManager.updateURLs(apiURL: cfg.apiURL, dashboardURL: cfg.dashboardURL, for: account.id)
+        accountManager.updateQueryMode(cfg.queryMode, for: account.id)
+        // 同步 router @State（用户当下能直接看到变化）
+        routerUpstreamURL = cfg.routerUpstream
+        routerDefaultModel = cfg.defaultModel
+        routerRouteModel = cfg.routeModel
+        routerStreaming = true
+        routerFailoverEnabled = true
+        saveRouterSettings()
+        // 重新拉 @State
+        loadFieldsFromActiveAccount()
+        // 反馈
+        urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设")
+    }
 
     private func applyRouterPreset(for accountID: UUID, upstreamURL: String, defaultModel: String) {
         let existing = accountManager.account(id: accountID)?.activeRouterSettings ?? RouterSettings(
@@ -1228,6 +1250,21 @@ private enum AddKind { case account, codex }
             }
             .padding(.vertical, 4)
 
+            // 1 套统一 provider 预设 chip（4 个，1 次点击设齐 URL+QueryMode+Router+RouteModel+Streaming+Failover）
+            HStack(spacing: 6) {
+                Text("预设:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(ProviderPreset.allCases) { preset in
+                    Button(preset.rawValue) {
+                        applyProviderPreset(preset, for: account)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding(.bottom, 4)
+
             if routerEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 4) {
@@ -1242,45 +1279,7 @@ private enum AddKind { case account, codex }
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
-                    HStack(spacing: 8) {
-                        Text("上游预设:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-	                        Button("DeepSeek") {
-	                            routerUpstreamURL = "https://api.deepseek.com/v1"
-	                            routerDefaultModel = "deepseek-chat"
-	                            routerRouteModel = "codex-mini"
-	                            routerStreaming = true
-	                            routerFailoverEnabled = true
-	                            saveRouterSettings()
-	                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        Button("ModelScope") {
-                            routerUpstreamURL = "https://api-inference.modelscope.cn/v1"
-                            routerDefaultModel = "ZhipuAI/GLM-5.1"
-                            routerRouteModel = "codex-mini"
-                            routerStreaming = true
-                            routerFailoverEnabled = true
-                            saveRouterSettings()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-
-
-                            Button("OpenRouter") {
-                                routerUpstreamURL = "https://openrouter.ai/api/v1"
-                                routerDefaultModel = "deepseek/deepseek-v4-flash:free"
-                                routerRouteModel = "codex-mini"
-                                routerStreaming = true
-                                routerFailoverEnabled = true
-                                saveRouterSettings()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                    }
+                    // 3 个重复 provider 按钮已删除（统一到 Toggle 下方 1 套 chip）
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
