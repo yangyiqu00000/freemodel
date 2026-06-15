@@ -446,14 +446,53 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 10) {
             Image(systemName: "gearshape.fill")
                 .font(.title2)
                 .foregroundStyle(.blue)
-            Text("FreeModel 设置")
-                .font(.title2)
-                .fontWeight(.bold)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("FreeModel 设置")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                HStack(spacing: 6) {
+                    Text(headerSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let dot = headerStatusDot {
+                        Circle()
+                            .fill(dot)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            }
             Spacer()
+        }
+    }
+
+    private var headerSubtitle: String {
+        let accountCount = accountManager.accounts.count
+        let codexCount = codexInjectionLayer.injectionConfigurations.count
+        let activeCodexLabel: String? = codexInjectionLayer.activeInjection.flatMap { info in
+            codexInjectionLayer.injectionConfigurations.first(where: { $0.id == info.configurationID })?.label
+        }
+        let accountPart = accountCount == 0 ? "无账号" : "\(accountCount) 个账号"
+        let codexPart: String
+        if let label = activeCodexLabel {
+            codexPart = "注入：\(label)"
+        } else if codexCount == 0 {
+            codexPart = "无注入"
+        } else {
+            codexPart = "\(codexCount) 条注入"
+        }
+        return "\(accountPart) · \(codexPart)"
+    }
+
+    private var headerStatusDot: Color? {
+        switch routerManager.status {
+        case .running: return .green
+        case .starting: return .orange
+        case .failed, .portInUse, .missingKey: return .red
+        case .off: return nil
         }
     }
 
@@ -1151,7 +1190,7 @@ struct SettingsView: View {
                             saveRouterSettings()
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(routerPort.isEmpty || routerUpstreamURL.isEmpty || routerRouteModel.isEmpty || routerDefaultModel.isEmpty)
+                        .disabled(!routerIsValid())
                     }
                     .padding(.top, 4)
                 }
@@ -1162,16 +1201,41 @@ struct SettingsView: View {
         .sectionPanel()
     }
 
+    // MARK: - 路由器设置校验
+
+    private func routerFieldEmpty(_ text: String) -> Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func routerIsValid() -> Bool {
+        !routerFieldEmpty(routerPort)
+            && !routerFieldEmpty(routerUpstreamURL)
+            && !routerFieldEmpty(routerRouteModel)
+            && !routerFieldEmpty(routerDefaultModel)
+    }
+
     // MARK: - Global Logs Console Views & Actions
 
     private var logsHeader: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 10) {
             Image(systemName: "terminal.fill")
                 .font(.title2)
                 .foregroundStyle(.green)
-            Text("路由代理运行日志")
-                .font(.title2)
-                .fontWeight(.bold)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("路由代理运行日志")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                HStack(spacing: 6) {
+                    Text(routerStatusSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let dot = headerStatusDot {
+                        Circle()
+                            .fill(dot)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            }
             Spacer()
         }
     }
