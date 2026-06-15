@@ -188,15 +188,14 @@ struct SettingsView: View {
 
                 Section(header: Text("运行日志")) {
                     HStack {
-                        Label("运行日志", systemImage: "terminal.fill")
-                        Spacer()
-                        if routerManager.status == .running {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                        }
+                        SidebarRow(
+                            icon: "terminal.fill",
+                            iconColor: routerManager.status == .running ? .green : .secondary,
+                            title: "运行日志",
+                            subtitle: routerStatusSubtitle,
+                            statusColor: routerManager.status == .running ? .green : nil
+                        )
                     }
-                    .tag(SidebarItem.logs)
                 }
             }
             .listStyle(.sidebar)
@@ -340,21 +339,67 @@ struct SettingsView: View {
         )
     }
 
+    // MARK: - 侧边栏统一行组件（账号行 / 注入配置行 / 日志行 共用）
+
+    private struct SidebarRow: View {
+        let icon: String
+        let iconColor: Color
+        let title: String
+        let subtitle: String?
+        let statusColor: Color?
+        let subtitleColor: Color
+
+        init(icon: String,
+             iconColor: Color = .secondary,
+             title: String,
+             subtitle: String? = nil,
+             statusColor: Color? = nil,
+             subtitleColor: Color = .secondary) {
+            self.icon = icon
+            self.iconColor = iconColor
+            self.title = title
+            self.subtitle = subtitle
+            self.statusColor = statusColor
+            self.subtitleColor = subtitleColor
+        }
+
+        var body: some View {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(subtitleColor)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 4)
+                if let statusColor {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .padding(.vertical, 3)
+        }
+    }
     // MARK: - 单条注入配置行
 
     private func codexConfigRow(_ cfg: InjectionConfiguration) -> some View {
         let isActive = (codexInjectionLayer.activeInjection?.configurationID == cfg.id)
-        return HStack(spacing: 6) {
-            Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isActive ? .green : .secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(cfg.label).lineLimit(1)
-                Text("\(cfg.kind == .official ? "官方" : "第三方") · \(cfg.providerID)")
-                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 2)
+        return SidebarRow(
+            icon: isActive ? "checkmark.circle.fill" : "circle",
+            iconColor: isActive ? .green : .secondary,
+            title: cfg.label,
+            subtitle: "\(cfg.kind == .official ? "官方" : "第三方") · \(cfg.providerID)",
+            statusColor: isActive ? .green : nil
+        )
     }
 
     private static func shortNow() -> String {
@@ -391,21 +436,13 @@ struct SettingsView: View {
         routerMinIntervalMs = String(s.minIntervalMs ?? 0)
 	    }
 
-	    private func accountRow(_ account: ProviderAccount) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: account.hasDashboardSession ? "checkmark.circle.fill" : "person.crop.circle")
-                .foregroundStyle(account.hasDashboardSession ? .green : .secondary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.displayName)
-                    .lineLimit(1)
-                Text(accountStatusText(account))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-        .padding(.vertical, 4)
+    private func accountRow(_ account: ProviderAccount) -> some View {
+        SidebarRow(
+            icon: account.hasDashboardSession ? "checkmark.circle.fill" : "person.crop.circle",
+            iconColor: account.hasDashboardSession ? .green : .secondary,
+            title: account.displayName,
+            subtitle: accountStatusText(account)
+        )
     }
 
     private var header: some View {
@@ -1286,6 +1323,19 @@ struct SettingsView: View {
         let allLogs = logTexts.joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(allLogs, forType: .string)
+    }
+
+    // MARK: - 路由状态文本（侧边栏日志行 + 详情区 header 共用）
+
+    private var routerStatusSubtitle: String {
+        switch routerManager.status {
+        case .off: return "路由未启动"
+        case .starting: return "路由启动中…"
+        case .running: return "路由运行中"
+        case .failed: return "路由启动失败"
+        case .portInUse: return "端口被占用"
+        case .missingKey: return "缺少 API Key"
+        }
     }
 }
 
