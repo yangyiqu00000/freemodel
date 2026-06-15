@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct SettingsView: View {
+
+private enum AddKind { case account, codex }
     @EnvironmentObject var accountManager: AccountManager
     @EnvironmentObject var balanceManager: BalanceManager
     @EnvironmentObject var routerManager: RouterManager
@@ -32,11 +34,10 @@ struct SettingsView: View {
     @State private var dashboardURLInput: String = ""
 
     // 账号 sidebar state
-    @State private var accountAddExpanded: Bool = false
+    @State private var addExpanded: AddKind? = nil
     @State private var newAccountLabel: String = ""
 
     // Codex 注入 sidebar state
-    @State private var codexAddExpanded: Bool = false
     @State private var newCodexLabel: String = ""
     @State private var newCodexProvider: String = ""
 
@@ -142,7 +143,7 @@ struct SettingsView: View {
             )) {
                 Section(header: accountsSectionHeader) {
                     ForEach(accountManager.accounts) { account in
-                    if accountAddExpanded {
+                    if addExpanded == .account {
                         accountsInlineAddRow
                     }
                         accountRow(account)
@@ -162,7 +163,7 @@ struct SettingsView: View {
                 }
 
                 Section(header: codexSectionHeader) {
-                    if codexAddExpanded {
+                    if addExpanded == .codex {
                         codexInlineAddRow
                     }
                         ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
@@ -211,12 +212,12 @@ struct SettingsView: View {
                 .font(.headline)
             Spacer()
             Button {
-                accountAddExpanded.toggle()
-                if accountAddExpanded {
+                addExpanded = (addExpanded == .account) ? nil : .account
+                if addExpanded == .account {
                     newAccountLabel = "新账号 \(Self.shortNow())"
                 }
             } label: {
-                Image(systemName: accountAddExpanded ? "minus" : "plus")
+                Image(systemName: addExpanded == .account ? "minus" : "plus")
             }
             .buttonStyle(.borderless)
             .help("新增账号")
@@ -237,7 +238,7 @@ struct SettingsView: View {
                     let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "freemodel")
                     accountManager.selectAccount(id: account.id)
                     balanceManager.syncFromActiveAccount()
-                    accountAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("FreeModel 网页", systemImage: "globe")
                 }
@@ -245,7 +246,7 @@ struct SettingsView: View {
                     let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "deepseek")
                     accountManager.selectAccount(id: account.id)
                     balanceManager.syncFromActiveAccount()
-                    accountAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("DeepSeek API", systemImage: "key.fill")
                 }
@@ -253,7 +254,7 @@ struct SettingsView: View {
                     let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "openrouter")
                     accountManager.selectAccount(id: account.id)
                     balanceManager.syncFromActiveAccount()
-                    accountAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("OpenRouter API", systemImage: "arrow.triangle.branch")
                 }
@@ -261,13 +262,13 @@ struct SettingsView: View {
                     let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "modelscope")
                     accountManager.selectAccount(id: account.id)
                     balanceManager.syncFromActiveAccount()
-                    accountAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("ModelScope API", systemImage: "cube")
                 }
                 Spacer()
                 Button("取消") {
-                    accountAddExpanded = false
+                    addExpanded = nil
                 }
             }
             .font(.caption)
@@ -285,13 +286,13 @@ struct SettingsView: View {
                 .font(.headline)
             Spacer()
             Button {
-                codexAddExpanded.toggle()
-                if codexAddExpanded {
+                addExpanded = (addExpanded == .codex) ? nil : .codex
+                if addExpanded == .codex {
                     newCodexLabel = "新配置 \(Self.shortNow())"
                     newCodexProvider = "custom-\(Self.shortNow())"
                 }
             } label: {
-                Image(systemName: codexAddExpanded ? "minus" : "plus")
+                Image(systemName: addExpanded == .codex ? "minus" : "plus")
             }
             .buttonStyle(.borderless)
             .help("添加一条新的注入配置")
@@ -315,19 +316,19 @@ struct SettingsView: View {
                 Text("种类").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
                 Button {
                     codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
-                    codexAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("官方", systemImage: "person.crop.circle.badge.checkmark")
                 }
                 Button {
                     codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
-                    codexAddExpanded = false
+                    addExpanded = nil
                 } label: {
                     Label("第三方", systemImage: "square.and.pencil")
                 }
                 Spacer()
                 Button("取消") {
-                    codexAddExpanded = false
+                    addExpanded = nil
                 }
             }
             .font(.caption)
@@ -503,12 +504,9 @@ struct SettingsView: View {
                 .foregroundStyle(.orange)
             Text("还没有账号")
                 .font(.headline)
-	            Button("新增 FreeModel 账号") {
-	                let account = accountManager.createAccount()
-	                accountManager.selectAccount(id: account.id)
-                balanceManager.syncFromActiveAccount()
-            }
-            .buttonStyle(.borderedProminent)
+            Text("点击侧边栏右上角的 + 添加账号")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 360)
     }
