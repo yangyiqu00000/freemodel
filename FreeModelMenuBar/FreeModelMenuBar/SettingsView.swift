@@ -118,6 +118,7 @@ private enum AddKind { case account, codex }
 
     // 日志清除 toast
     @State private var logsClearedToast: String? = nil
+    @State private var pendingScrollToAPIKey: Bool = false
     @State private var logsClearedToastToken: Int = 0
 
     // Router State
@@ -146,8 +147,9 @@ private enum AddKind { case account, codex }
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
                     if let selected = selectedItem {
                         switch selected {
                         case .account(let accountID):
@@ -193,6 +195,13 @@ private enum AddKind { case account, codex }
                 }
                 .padding(24)
             }
+            .onChange(of: pendingScrollToAPIKey) { newValue in
+                if newValue {
+                    withAnimation { proxy.scrollTo("apiKeyAnchor", anchor: .top) }
+                    pendingScrollToAPIKey = false
+                }
+            }
+        }
         }
         .frame(width: 720, height: 620)
         .onAppear {
@@ -807,6 +816,7 @@ private enum AddKind { case account, codex }
     private func apiKeySection(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("API Key", systemImage: "key.fill")
+                .id("apiKeyAnchor")
                 .font(.headline)
 
 	            Text("API Key 按账号单独保存，可用于当前账号的余额查询和本地 Responses 路由代理。测试连接成功后会自动保存。")
@@ -1266,8 +1276,8 @@ private enum AddKind { case account, codex }
                     }
                     Spacer()
                     Button("去配置") {
-                        // 滚动到 apiKey 锚点（需要 ScrollView 套 ScrollViewReader，未来扩展）
-                        // 当前简化：仅更新状态提示让用户知道操作生效了
+                        // 触发 onChange 走 proxy.scrollTo（apiKeySection 头部已加 .id 锚点）
+                        pendingScrollToAPIKey = true
                         apiKeyStatus = .empty
                     }
                     .buttonStyle(.bordered)
