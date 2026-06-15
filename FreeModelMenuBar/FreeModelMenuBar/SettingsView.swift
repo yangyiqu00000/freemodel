@@ -45,6 +45,11 @@ private enum AddKind { case account, codex }
     @State private var pendingDeleteAccount: ProviderAccount? = nil
     @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
 
+    // 详情区 DisclosureGroup 展开状态
+    @State private var isAccountGroupExpanded: Bool = true
+    @State private var isConnectionGroupExpanded: Bool = true
+    @State private var isRouterGroupExpanded: Bool = false
+
     // 日志清除 toast
     @State private var logsClearedToast: String? = nil
     @State private var logsClearedToastToken: Int = 0
@@ -82,14 +87,38 @@ private enum AddKind { case account, codex }
                         case .account(let accountID):
                             if let account = accountManager.accounts.first(where: { $0.id == accountID }) {
                                 header
-                                accountDetails(account)
-                                queryModeSection(account)
-                                dashboardSection(account)
-                                apiKeySection(account)
-                                routerSection(account)
-                                customURLsSection(account)
-                                refreshSection
-                                linksSection(account)
+
+                                DisclosureGroup(isExpanded: $isAccountGroupExpanded) {
+                                    VStack(alignment: .leading, spacing: 18) {
+                                        accountDetails(account)
+                                        queryModeSection(account)
+                                        linksSection(account)
+                                    }
+                                } label: {
+                                    Label("账号", systemImage: "person.text.rectangle")
+                                        .font(.headline)
+                                }
+
+                                DisclosureGroup(isExpanded: $isConnectionGroupExpanded) {
+                                    VStack(alignment: .leading, spacing: 18) {
+                                        dashboardSection(account)
+                                        apiKeySection(account)
+                                    }
+                                } label: {
+                                    Label("连接", systemImage: "link")
+                                        .font(.headline)
+                                }
+
+                                DisclosureGroup(isExpanded: $isRouterGroupExpanded) {
+                                    VStack(alignment: .leading, spacing: 18) {
+                                        routerSection(account)
+                                        customURLsSection(account)
+                                        refreshSection
+                                    }
+                                } label: {
+                                    Label("路由", systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.headline)
+                                }
                             } else {
                                 emptyState
                             }
@@ -1071,6 +1100,11 @@ private enum AddKind { case account, codex }
         accountManager.updateRouterSettings(settings, for: accountID)
     }
 
+    private func toggleLabel(routerEnabled: Bool, hasAPIKey: Bool) -> String {
+        if !hasAPIKey { return "请先配置 API Key" }
+        return routerEnabled ? "正在运行代理" : "启用本地路由代理"
+    }
+
     // MARK: - Router Section
 
     private func logRowView(_ log: RouterLogEntry) -> some View {
@@ -1160,17 +1194,12 @@ private enum AddKind { case account, codex }
                         saveRouterSettings()
                     }
                 )) {
-                    Text(routerEnabled ? "正在运行代理" : "启用本地路由代理")
+                    Text(toggleLabel(routerEnabled: routerEnabled, hasAPIKey: account.hasAPIKey))
                         .fontWeight(.semibold)
+                        .foregroundStyle(account.hasAPIKey ? Color.primary : .red)
                 }
                 .disabled(!account.hasAPIKey)
-                
-                if !account.hasAPIKey {
-                    Text("(需要配置 API Key)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                
+
                 Spacer()
             }
             .padding(.vertical, 4)
@@ -1306,11 +1335,15 @@ private enum AddKind { case account, codex }
                         }
                     }
 
+                    // Toggle 一行，按钮单独一行右侧
                     HStack(spacing: 20) {
                         Toggle("流式响应 (Streaming)", isOn: $routerStreaming)
                             .font(.caption)
                         Toggle("自动灾备转移 (Failover)", isOn: $routerFailoverEnabled)
                             .font(.caption)
+                        Spacer()
+                    }
+                    HStack {
                         Spacer()
                         Button("保存及重载配置") {
                             saveRouterSettings()
