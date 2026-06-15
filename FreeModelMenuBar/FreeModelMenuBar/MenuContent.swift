@@ -291,7 +291,7 @@ struct MenuContent: View {
                     Image(systemName: "clock")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("7天窗口重置: \(expiresAt.formatted(date: .numeric, time: .shortened))")
+                    Text("过期时间: \(expiresAt.formatted(date: .numeric, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
