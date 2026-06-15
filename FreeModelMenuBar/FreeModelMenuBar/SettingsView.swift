@@ -240,15 +240,7 @@ private enum AddKind { case account, codex }
                 accountsInlineAddRow
             }
             ForEach(accountManager.accounts) { account in
-                accountRow(account)
-                    .tag(SidebarItem.account(account.id))
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            pendingDeleteAccount = account
-                        } label: {
-                            Label("删除账号", systemImage: "trash")
-                        }
-                    }
+                accountListRow(account)
             }
         }
     }
@@ -259,20 +251,7 @@ private enum AddKind { case account, codex }
                 codexInlineAddRow
             }
             ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
-                codexConfigRow(cfg)
-                    .tag(SidebarItem.codexInjectionConfig(cfg.id))
-                    .contextMenu {
-                        Button {
-                            codexInjectionLayer.activateConfiguration(id: cfg.id)
-                        } label: {
-                            Label("激活", systemImage: "bolt.fill")
-                        }
-                        Button(role: .destructive) {
-                            pendingDeleteCodexConfig = cfg
-                        } label: {
-                            Label("删除", systemImage: "trash")
-                        }
-                    }
+                codexConfigListRow(cfg)
             }
         }
     }
@@ -292,6 +271,37 @@ private enum AddKind { case account, codex }
             )
         }
     }
+    // MARK: - 侧边栏行 helper（含 contextMenu，避免 ForEach 体内 type-check 累积）
+
+    private func accountListRow(_ account: ProviderAccount) -> some View {
+        accountRow(account)
+            .tag(SidebarItem.account(account.id))
+            .contextMenu {
+                Button(role: .destructive) {
+                    pendingDeleteAccount = account
+                } label: {
+                    Label("删除账号", systemImage: "trash")
+                }
+            }
+    }
+
+    private func codexConfigListRow(_ cfg: InjectionConfiguration) -> some View {
+        codexConfigRow(cfg)
+            .tag(SidebarItem.codexInjectionConfig(cfg.id))
+            .contextMenu {
+                Button {
+                    codexInjectionLayer.activateConfiguration(id: cfg.id)
+                } label: {
+                    Label("激活", systemImage: "bolt.fill")
+                }
+                Button(role: .destructive) {
+                    pendingDeleteCodexConfig = cfg
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
+    }
+
 
     // MARK: - 账号 section 标题（与 Codex 注入同形状：label + 右侧 +）
 
