@@ -1250,6 +1250,43 @@ private enum AddKind { case account, codex }
             }
             .padding(.vertical, 4)
 
+            // 缺 API Key 提示卡片（Toggle 禁用 + 视觉警告 + 引导去连接段配置）
+            if !account.hasAPIKey {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("未配置 API Key")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.red)
+                        Text("启用本地路由代理需要 API Key，请先在上方「连接」段配置并测试。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("去配置") {
+                        // 滚动到 apiKey 锚点（需要 ScrollView 套 ScrollViewReader，未来扩展）
+                        // 当前简化：仅更新状态提示让用户知道操作生效了
+                        apiKeyStatus = .empty
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(.orange)
+                    .help("向上滚动到「连接」段配置 API Key")
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.red.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.bottom, 4)
+            }
+
             // 1 套统一 provider 预设 chip（4 个，1 次点击设齐 URL+QueryMode+Router+RouteModel+Streaming+Failover）
             HStack(spacing: 6) {
                 Text("预设:")
