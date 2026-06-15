@@ -11,10 +11,12 @@ struct SettingsView: View {
     @EnvironmentObject var accountManager: AccountManager
     @EnvironmentObject var balanceManager: BalanceManager
     @EnvironmentObject var routerManager: RouterManager
+    @StateObject private var codexInjectionLayer: AppLayer = AppLayer.shared
 
     enum SidebarItem: Hashable {
         case account(UUID)
         case logs
+        case codexInjectionConfig(String)
     }
 
     @State private var selectedItem: SidebarItem? = nil
@@ -28,6 +30,15 @@ struct SettingsView: View {
     @State private var renameText: String = ""
     @State private var apiURLInput: String = ""
     @State private var dashboardURLInput: String = ""
+
+    // 账号 sidebar state
+    @State private var accountAddExpanded: Bool = false
+    @State private var newAccountLabel: String = ""
+
+    // Codex 注入 sidebar state
+    @State private var codexAddExpanded: Bool = false
+    @State private var newCodexLabel: String = ""
+    @State private var newCodexProvider: String = ""
 
     // Router State
     @State private var routerEnabled: Bool = false
@@ -76,6 +87,8 @@ struct SettingsView: View {
                         case .logs:
                             logsHeader
                             logsConsoleSection
+                        case .codexInjectionConfig(let cfgID):
+                            CodexInjectionSettingsView(appLayer: codexInjectionLayer, configurationID: cfgID)
                         }
                     } else {
                         emptyState
@@ -114,39 +127,6 @@ struct SettingsView: View {
 
     private var accountList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("账号", systemImage: "person.2.fill")
-                    .font(.headline)
-                Spacer()
-                Menu {
-                    Button("FreeModel 网页账号") {
-                        let account = accountManager.createAccount(providerID: "freemodel")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                    }
-                    Button("DeepSeek API 账号") {
-                        let account = accountManager.createAccount(providerID: "deepseek")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                    }
-                    Button("OpenRouter API 账号") {
-                        let account = accountManager.createAccount(providerID: "openrouter")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                    }
-                    Button("ModelScope API 账号") {
-                        let account = accountManager.createAccount(providerID: "modelscope")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .menuStyle(.borderlessButton)
-                .help("新增账号")
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 16)
 
             List(selection: Binding(
                 get: { selectedItem },
@@ -160,14 +140,53 @@ struct SettingsView: View {
                     }
                 }
             )) {
-                Section(header: Text("账号列表")) {
+                Section(header: accountsSectionHeader) {
                     ForEach(accountManager.accounts) { account in
+                    if accountAddExpanded {
+                        accountsInlineAddRow
+                    }
                         accountRow(account)
                             .tag(SidebarItem.account(account.id))
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    _ = accountManager.deleteAccount(id: account.id)
+                                    balanceManager.syncFromActiveAccount()
+                                    if case .account(let id) = selectedItem, id == account.id {
+                                        selectedItem = nil
+                                    }
+                                } label: {
+                                    Label("删除账号", systemImage: "trash")
+                                }
+                            }
                     }
                 }
 
-                Section(header: Text("系统管理")) {
+                Section(header: codexSectionHeader) {
+                    if codexAddExpanded {
+                        codexInlineAddRow
+                    }
+                        ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
+                            codexConfigRow(cfg)
+                                .tag(SidebarItem.codexInjectionConfig(cfg.id))
+                                .contextMenu {
+                                    Button {
+                                        codexInjectionLayer.activateConfiguration(id: cfg.id)
+                                    } label: {
+                                        Label("激活", systemImage: "bolt.fill")
+                                    }
+                                    Button(role: .destructive) {
+                                        codexInjectionLayer.deleteConfiguration(id: cfg.id)
+                                        if case .codexInjectionConfig(let id) = selectedItem, id == cfg.id {
+                                            selectedItem = nil
+                                        }
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                }
+                        }
+                }
+
+                Section(header: Text("运行日志")) {
                     HStack {
                         Label("运行日志", systemImage: "terminal.fill")
                         Spacer()
@@ -181,17 +200,167 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
-
-            Button(role: .destructive) {
-                deleteActiveAccount()
-            } label: {
-                Label("删除当前账号", systemImage: "trash")
-            }
-            .disabled(accountManager.activeAccount == nil)
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 16)
         }
+    }
+
+
+    // MARK: - 账号 section 标题（与 Codex 注入同形状：label + 右侧 +）
+
+    private var accountsSectionHeader: some View {
+        HStack {
+            Label("账号", systemImage: "person.2.fill")
+                .font(.headline)
+            Spacer()
+            Button {
+                accountAddExpanded.toggle()
+                if accountAddExpanded {
+                    newAccountLabel = "新账号 \(Self.shortNow())"
+                }
+            } label: {
+                Image(systemName: accountAddExpanded ? "minus" : "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("新增账号")
+        }
+    }
+    // MARK: - 内联账号添加行（与 codexInlineAddRow 同形状）
+
+    private var accountsInlineAddRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("名称").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                TextField("例如：我的 DeepSeek", text: $newAccountLabel)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                Text("种类").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                Button {
+                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "freemodel")
+                    accountManager.selectAccount(id: account.id)
+                    balanceManager.syncFromActiveAccount()
+                    accountAddExpanded = false
+                } label: {
+                    Label("FreeModel 网页", systemImage: "globe")
+                }
+                Button {
+                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "deepseek")
+                    accountManager.selectAccount(id: account.id)
+                    balanceManager.syncFromActiveAccount()
+                    accountAddExpanded = false
+                } label: {
+                    Label("DeepSeek API", systemImage: "key.fill")
+                }
+                Button {
+                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "openrouter")
+                    accountManager.selectAccount(id: account.id)
+                    balanceManager.syncFromActiveAccount()
+                    accountAddExpanded = false
+                } label: {
+                    Label("OpenRouter API", systemImage: "arrow.triangle.branch")
+                }
+                Button {
+                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "modelscope")
+                    accountManager.selectAccount(id: account.id)
+                    balanceManager.syncFromActiveAccount()
+                    accountAddExpanded = false
+                } label: {
+                    Label("ModelScope API", systemImage: "cube")
+                }
+                Spacer()
+                Button("取消") {
+                    accountAddExpanded = false
+                }
+            }
+            .font(.caption)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.blue.opacity(0.08))
+        )
+    }
+
+    private var codexSectionHeader: some View {
+        HStack {
+            Label("Codex 注入", systemImage: "key.horizontal")
+                .font(.headline)
+            Spacer()
+            Button {
+                codexAddExpanded.toggle()
+                if codexAddExpanded {
+                    newCodexLabel = "新配置 \(Self.shortNow())"
+                    newCodexProvider = "custom-\(Self.shortNow())"
+                }
+            } label: {
+                Image(systemName: codexAddExpanded ? "minus" : "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("添加一条新的注入配置")
+        }
+    }
+    // MARK: - 内联添加行（替代 sheet）
+
+    private var codexInlineAddRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("标签").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                TextField("例如：本地 relay", text: $newCodexLabel)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                Text("Provider").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                TextField("例如：local-relay", text: $newCodexProvider)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                Text("种类").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                Button {
+                    codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
+                    codexAddExpanded = false
+                } label: {
+                    Label("官方", systemImage: "person.crop.circle.badge.checkmark")
+                }
+                Button {
+                    codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
+                    codexAddExpanded = false
+                } label: {
+                    Label("第三方", systemImage: "square.and.pencil")
+                }
+                Spacer()
+                Button("取消") {
+                    codexAddExpanded = false
+                }
+            }
+            .font(.caption)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.blue.opacity(0.08))
+        )
+    }
+
+    // MARK: - 单条注入配置行
+
+    private func codexConfigRow(_ cfg: InjectionConfiguration) -> some View {
+        let isActive = (codexInjectionLayer.activeInjection?.configurationID == cfg.id)
+        return HStack(spacing: 6) {
+            Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isActive ? .green : .secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(cfg.label).lineLimit(1)
+                Text("\(cfg.kind == .official ? "官方" : "第三方") · \(cfg.providerID)")
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+
+    private static func shortNow() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMdd-HHmm"
+        return f.string(from: Date())
     }
 
 	    private func loadFieldsFromActiveAccount() {
