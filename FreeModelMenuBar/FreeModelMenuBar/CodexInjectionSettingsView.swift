@@ -15,6 +15,11 @@ struct CodexInjectionSettingsView: View {
     @ObservedObject var appLayer: AppLayer
     let configurationID: String
 
+    // 进入详情页时的"创建时" label / providerID（用于 undo 按钮）
+    @State private var initialLabel: String = ""
+    @State private var initialProviderID: String = ""
+    @State private var didCaptureInitial: Bool = false
+
     var body: some View {
         if let cfg = currentConfig {
             VStack(alignment: .leading, spacing: 16) {
@@ -26,6 +31,13 @@ struct CodexInjectionSettingsView: View {
             }
             .padding(20)
             .task { await appLayer.refresh() }
+            .onAppear {
+                if !didCaptureInitial {
+                    initialLabel = cfg.label
+                    initialProviderID = cfg.providerID
+                    didCaptureInitial = true
+                }
+            }
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: "questionmark.circle")
@@ -86,7 +98,21 @@ struct CodexInjectionSettingsView: View {
     private func labelsAndProvider(_ cfg: InjectionConfiguration) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("标签").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("标签").font(.caption).foregroundStyle(.secondary)
+                    if cfg.label != initialLabel {
+                        Button {
+                            var copy = cfg
+                            copy.label = initialLabel
+                            appLayer.updateConfiguration(copy)
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("还原为本条配置创建时的标签")
+                    }
+                }
                 TextField("标签", text: Binding(
                     get: { cfg.label },
                     set: { newValue in
@@ -99,7 +125,21 @@ struct CodexInjectionSettingsView: View {
                 .frame(maxWidth: 220)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Provider").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("Provider").font(.caption).foregroundStyle(.secondary)
+                    if cfg.providerID != initialProviderID {
+                        Button {
+                            var copy = cfg
+                            copy.providerID = initialProviderID
+                            appLayer.updateConfiguration(copy)
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("还原为本条配置创建时的 Provider")
+                    }
+                }
                 TextField("provider id", text: Binding(
                     get: { cfg.providerID },
                     set: { newValue in
@@ -121,7 +161,7 @@ struct CodexInjectionSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             if cfg.kind == .official {
                 HStack {
-                    Text("auth.json").font(.caption).foregroundStyle(.secondary)
+                    Text("auth.json (\(cfg.authJSON.count) 字符)").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button {
                         appLayer.captureCurrentCodexState(into: cfg.id)
@@ -133,7 +173,7 @@ struct CodexInjectionSettingsView: View {
                     .help("在终端跑完 `codex` 完成 ChatGPT 登录后，点此把当前真实状态保存到本条配置。")
                 }
             } else {
-                Text("auth.json").font(.caption).foregroundStyle(.secondary)
+                Text("auth.json (\(cfg.authJSON.count) 字符)").font(.caption).foregroundStyle(.secondary)
             }
             AutoResizingTextEditor(
                 text: Binding(
@@ -149,7 +189,7 @@ struct CodexInjectionSettingsView: View {
                 maxHeight: 320
             )
 
-            Text("config.toml").font(.caption).foregroundStyle(.secondary)
+            Text("config.toml (\(cfg.configTOML.count) 字符)").font(.caption).foregroundStyle(.secondary)
             AutoResizingTextEditor(
                 text: Binding(
                     get: { cfg.configTOML },

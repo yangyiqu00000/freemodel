@@ -278,47 +278,59 @@ private enum AddKind { case account, codex }
                 TextField("例如：我的 DeepSeek", text: $newAccountLabel)
                     .textFieldStyle(.roundedBorder)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("种类").frame(maxWidth: .infinity, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                // 2×2 网格：4 个 provider 各占一格，避开 220px 侧栏拥挤
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 6),
+                    GridItem(.flexible(), spacing: 6)
+                ], spacing: 6) {
+                    Button {
+                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "freemodel")
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
+                        addExpanded = nil
+                    } label: {
+                        Label("FreeModel 网页", systemImage: "globe")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "deepseek")
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
+                        addExpanded = nil
+                    } label: {
+                        Label("DeepSeek API", systemImage: "key.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "openrouter")
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
+                        addExpanded = nil
+                    } label: {
+                        Label("OpenRouter API", systemImage: "arrow.triangle.branch")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "modelscope")
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
+                        addExpanded = nil
+                    } label: {
+                        Label("ModelScope API", systemImage: "cube")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
             HStack {
-                Text("种类").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
-                Button {
-                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "freemodel")
-                    accountManager.selectAccount(id: account.id)
-                    balanceManager.syncFromActiveAccount()
-                    addExpanded = nil
-                } label: {
-                    Label("FreeModel 网页", systemImage: "globe")
-                }
-                Button {
-                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "deepseek")
-                    accountManager.selectAccount(id: account.id)
-                    balanceManager.syncFromActiveAccount()
-                    addExpanded = nil
-                } label: {
-                    Label("DeepSeek API", systemImage: "key.fill")
-                }
-                Button {
-                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "openrouter")
-                    accountManager.selectAccount(id: account.id)
-                    balanceManager.syncFromActiveAccount()
-                    addExpanded = nil
-                } label: {
-                    Label("OpenRouter API", systemImage: "arrow.triangle.branch")
-                }
-                Button {
-                    let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "modelscope")
-                    accountManager.selectAccount(id: account.id)
-                    balanceManager.syncFromActiveAccount()
-                    addExpanded = nil
-                } label: {
-                    Label("ModelScope API", systemImage: "cube")
-                }
                 Spacer()
                 Button("取消") {
                     addExpanded = nil
                 }
             }
-            .font(.caption)
         }
+        .font(.caption)
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 6)
@@ -358,27 +370,36 @@ private enum AddKind { case account, codex }
                 TextField("例如：local-relay", text: $newCodexProvider)
                     .textFieldStyle(.roundedBorder)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("种类").frame(maxWidth: .infinity, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 6),
+                    GridItem(.flexible(), spacing: 6)
+                ], spacing: 6) {
+                    Button {
+                        codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
+                        addExpanded = nil
+                    } label: {
+                        Label("官方", systemImage: "person.crop.circle.badge.checkmark")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
+                        addExpanded = nil
+                    } label: {
+                        Label("第三方", systemImage: "square.and.pencil")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
             HStack {
-                Text("种类").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
-                Button {
-                    codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
-                    addExpanded = nil
-                } label: {
-                    Label("官方", systemImage: "person.crop.circle.badge.checkmark")
-                }
-                Button {
-                    codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
-                    addExpanded = nil
-                } label: {
-                    Label("第三方", systemImage: "square.and.pencil")
-                }
                 Spacer()
                 Button("取消") {
                     addExpanded = nil
                 }
             }
-            .font(.caption)
         }
+        .font(.caption)
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 6)
@@ -729,6 +750,10 @@ private enum AddKind { case account, codex }
                 }
                 balanceManager.updateRefreshInterval(newValue)
             }
+
+            Text("控制台模式自动重新抓取余额的频率。API Key 模式不消耗此设置。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .sectionPanel()
     }
@@ -1078,7 +1103,7 @@ private enum AddKind { case account, codex }
                 }
             }
 
-            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。")
+            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。带 * 的字段不能为空。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -1150,9 +1175,14 @@ private enum AddKind { case account, codex }
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("本地代理端口")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 2) {
+                                Text("本地代理端口")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                if routerFieldEmpty(routerPort) {
+                                    Text("*").font(.caption2).foregroundStyle(.red)
+                                }
+                            }
                             TextField("38440", text: $routerPort)
                                 .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerPort) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
@@ -1160,9 +1190,14 @@ private enum AddKind { case account, codex }
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("对外暴露模型名")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 2) {
+                                Text("对外暴露模型名")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                if routerFieldEmpty(routerRouteModel) {
+                                    Text("*").font(.caption2).foregroundStyle(.red)
+                                }
+                            }
                             TextField("codex-mini", text: $routerRouteModel)
                                 .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerRouteModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
@@ -1170,18 +1205,28 @@ private enum AddKind { case account, codex }
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("上游 API Base URL")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 2) {
+                            Text("上游 API Base URL")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if routerFieldEmpty(routerUpstreamURL) {
+                                Text("*").font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                         TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
                             .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerUpstreamURL) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("映射到上游模型名")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 2) {
+                            Text("映射到上游模型名")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if routerFieldEmpty(routerDefaultModel) {
+                                Text("*").font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                         TextField("deepseek-chat", text: $routerDefaultModel)
                             .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerDefaultModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
