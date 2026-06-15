@@ -25,10 +25,25 @@ private enum AddKind { case account, codex }
     @State private var apiKeyInput: String = ""
     @State private var showAPIKey: Bool = false
     @State private var selectedRefreshInterval: TimeInterval = 300
-    @State private var showTestResult: Bool = false
-    @State private var testResultMessage: String = ""
-    @State private var testResultSuccess: Bool = false
     @State private var isTesting: Bool = false
+
+    // API Key 状态机（6 种状态，原 3 个 bool 收敛为 1 个枚举）
+    private enum ApiKeyStatus: Equatable {
+        case empty
+        case unsaved
+        case testing
+        case verified
+        case failed(String)
+        case saved
+    }
+    @State private var apiKeyStatus: ApiKeyStatus = .empty
+
+    // 自定义 URL / 预设切换反馈（原本借用 apiKeySection 的 showTestResult，跨区段渲染看不到）
+    private struct UrlPresetStatus: Equatable {
+        let success: Bool
+        let message: String
+    }
+    @State private var urlPresetStatus: UrlPresetStatus? = nil
     @State private var renameText: String = ""
     @State private var apiURLInput: String = ""
     @State private var dashboardURLInput: String = ""
@@ -157,7 +172,8 @@ private enum AddKind { case account, codex }
                     selectedItem = .logs
                 }
             }
-            showTestResult = false
+            apiKeyStatus = .unsaved
+            urlPresetStatus = nil
             balanceManager.syncFromActiveAccount()
             loadFieldsFromActiveAccount()
         }
@@ -572,10 +588,9 @@ private enum AddKind { case account, codex }
         routerMaxConcurrency = String(s.maxConcurrency ?? 0)
         routerMinIntervalMs = String(s.minIntervalMs ?? 0)
 
-        // 切到不同账号时，重置 API Key 测试结果 banner（避免上一个账号的提示泄漏）
-        showTestResult = false
-        testResultMessage = ""
-        testResultSuccess = false
+        // 切到不同账号时，重置 API Key / URL 预设状态（避免上一个账号的提示泄漏）
+        apiKeyStatus = .unsaved
+        urlPresetStatus = nil
 	    }
 
     private func accountRow(_ account: ProviderAccount) -> some View {
@@ -754,26 +769,41 @@ private enum AddKind { case account, codex }
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            HStack {
-                if showAPIKey {
-                    TextField("sk-...", text: $apiKeyInput)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
-                } else {
-                    SecureField("sk-...", text: $apiKeyInput)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
+            HStack(alignment: .center, spacing: 8) {
+                ZStack(alignment: .bottomTrailing) {
+                    if showAPIKey {
+                        TextField("sk-...", text: $apiKeyInput)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                            .onChange(of: apiKeyInput) { _ in
+                                if case .verified = apiKeyStatus { apiKeyStatus = .unsaved }
+                                if case .saved = apiKeyStatus { apiKeyStatus = .unsaved }
+                            }
+                    } else {
+                        SecureField("sk-...", text: $apiKeyInput)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                            .onChange(of: apiKeyInput) { _ in
+                                if case .verified = apiKeyStatus { apiKeyStatus = .unsaved }
+                                if case .saved = apiKeyStatus { apiKeyStatus = .unsaved }
+                            }
+                    }
+                    apiKeyStatusBadge
+                        .padding(6)
                 }
 
                 Button(action: { showAPIKey.toggle() }) {
                     Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.borderless)
                 .disabled(isTesting)
+                .help(showAPIKey ? "隐藏 API Key" : "显示 API Key")
 
                 if isTesting {
                     ProgressView()
                         .scaleEffect(0.6)
+                        .frame(width: 28, height: 28)
                         .help("正在测试连接")
                 }
             }
@@ -781,40 +811,32 @@ private enum AddKind { case account, codex }
             HStack(spacing: 12) {
                 Button("保存") {
                     balanceManager.apiKey = apiKeyInput
-                    showTestResult = true
-                    testResultSuccess = true
-                    testResultMessage = "已保存到当前账号"
+                    apiKeyStatus = .saved
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .disabled(apiKeyInput.isEmpty)
 
                 Button("测试连接") {
                     testConnection()
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .disabled(apiKeyInput.isEmpty || isTesting)
 
                 Button("清除 API Key") {
                     balanceManager.apiKey = nil
                     apiKeyInput = ""
-                    showTestResult = true
-                    testResultSuccess = true
-                    testResultMessage = "已清除当前账号的 API Key"
+                    apiKeyStatus = .empty
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
             }
 
-            if showTestResult {
-                HStack(spacing: 6) {
-                    Image(systemName: testResultSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(testResultSuccess ? .green : .red)
-                    Text(testResultMessage)
-                        .font(.caption)
-                        .foregroundStyle(testResultSuccess ? .green : .red)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .animation(.easeInOut(duration: 0.2), value: testResultMessage)
-            }
+
         }
         .sectionPanel()
     }
@@ -888,7 +910,7 @@ private enum AddKind { case account, codex }
 
     private func testConnection() {
         isTesting = true
-        showTestResult = false
+        apiKeyStatus = .testing
 
         let key = apiKeyInput
 
@@ -897,28 +919,23 @@ private enum AddKind { case account, codex }
 
             await MainActor.run {
                 isTesting = false
-                showTestResult = true
 
                 switch result {
                 case .success:
-	                    balanceManager.apiKey = key
-	                    testResultMessage = "连接成功，已保存到当前账号"
-	                    testResultSuccess = true
+                    balanceManager.apiKey = key
+                    apiKeyStatus = .verified
                 case .failure(.invalidAPIKey):
-                    testResultMessage = "API Key 无效"
-                    testResultSuccess = false
+                    apiKeyStatus = .failed("API Key 无效")
                 case .failure(.serverError(let code, let message)):
                     if code == 402 {
-                        testResultMessage = "API Key 可识别，但账户需要验证或充值"
+                        apiKeyStatus = .failed("API Key 可识别，但账户需要验证或充值")
                     } else if code == 429 {
-                        testResultMessage = "请求过于频繁"
+                        apiKeyStatus = .failed("请求过于频繁")
                     } else {
-                        testResultMessage = "服务器返回错误 (\(code)): \(message)"
+                        apiKeyStatus = .failed("服务器返回错误 (\(code)): \(message)")
                     }
-                    testResultSuccess = false
                 case .failure(let error):
-                    testResultMessage = error.errorDescription ?? "连接失败"
-                    testResultSuccess = false
+                    apiKeyStatus = .failed(error.errorDescription ?? "连接失败")
                 }
             }
         }
@@ -1000,9 +1017,7 @@ private enum AddKind { case account, codex }
 	                    accountManager.updateQueryMode(.dashboard, for: account.id)
 	                    applyRouterPreset(for: account.id, upstreamURL: "https://api.freemodel.dev/v1", defaultModel: "codex-mini")
 	                    loadFieldsFromActiveAccount()
-	                    showTestResult = true
-	                    testResultSuccess = true
-	                    testResultMessage = "已切换为 FreeModel 预设地址"
+	                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 FreeModel 预设地址")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1014,9 +1029,7 @@ private enum AddKind { case account, codex }
 	                    accountManager.updateQueryMode(.apiKey, for: account.id)
 	                    applyRouterPreset(for: account.id, upstreamURL: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat")
 	                    loadFieldsFromActiveAccount()
-	                    showTestResult = true
-	                    testResultSuccess = true
-	                    testResultMessage = "已切换为 DeepSeek 预设地址"
+	                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 DeepSeek 预设地址")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1029,9 +1042,7 @@ private enum AddKind { case account, codex }
                     accountManager.updateQueryMode(.apiKey, for: account.id)
                     applyRouterPreset(for: account.id, upstreamURL: "https://openrouter.ai/api/v1", defaultModel: "deepseek/deepseek-v4-flash:free")
                     loadFieldsFromActiveAccount()
-                    showTestResult = true
-                    testResultSuccess = true
-                    testResultMessage = "已切换为 OpenRouter 预设地址"
+                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 OpenRouter 预设地址")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1043,9 +1054,7 @@ private enum AddKind { case account, codex }
                     accountManager.updateQueryMode(.apiKey, for: account.id)
                     applyRouterPreset(for: account.id, upstreamURL: "https://api-inference.modelscope.cn/v1", defaultModel: "ZhipuAI/GLM-5.1")
                     loadFieldsFromActiveAccount()
-                    showTestResult = true
-                    testResultSuccess = true
-                    testResultMessage = "已切换为 ModelScope 预设地址"
+                    urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 ModelScope 预设地址")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1070,13 +1079,15 @@ private enum AddKind { case account, codex }
 
             Button("保存服务器地址") {
                 accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-                showTestResult = true
-                testResultSuccess = true
-                testResultMessage = "服务器地址已保存"
+                urlPresetStatus = UrlPresetStatus(success: true, message: "服务器地址已保存")
             }
             .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .frame(height: 28)
             .disabled(apiURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                       dashboardURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            urlPresetStatusBadge
         }
         .sectionPanel()
     }
@@ -1616,6 +1627,64 @@ private enum AddKind { case account, codex }
         case .starting: return .orange
         case .failed, .portInUse, .missingKey: return .red
         case .off: return nil
+        }
+    }
+
+    // MARK: - API Key 状态徽章（内嵌文本框右下角，统一 22pt 高，0.2s 淡入）
+
+    @ViewBuilder
+    private var apiKeyStatusBadge: some View {
+        let pair: (icon: String, color: Color, text: String)? = {
+            switch apiKeyStatus {
+            case .empty: return nil
+            case .unsaved: return ("circle", .secondary, "未保存")
+            case .testing: return nil  // testing 期间 ProgressView 已经在外侧显示
+            case .verified: return ("checkmark.seal.fill", .green, "已验证")
+            case .failed(let msg): return ("xmark.octagon.fill", .red, msg)
+            case .saved: return ("checkmark.circle", .blue, "已保存")
+            }
+        }()
+        if let pair {
+            HStack(spacing: 4) {
+                Image(systemName: pair.icon)
+                    .font(.caption2)
+                Text(pair.text)
+                    .font(.caption2)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(pair.color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(pair.color.opacity(0.12))
+            )
+            .frame(height: 22)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: apiKeyStatus)
+        }
+    }
+
+    // MARK: - URL 预设切换反馈徽章（内嵌 customURLsSection 末尾）
+
+    @ViewBuilder
+    private var urlPresetStatusBadge: some View {
+        if let status = urlPresetStatus {
+            HStack(spacing: 4) {
+                Image(systemName: status.success ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(.caption2)
+                Text(status.message)
+                    .font(.caption2)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(status.success ? .green : .red)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill((status.success ? Color.green : Color.red).opacity(0.12))
+            )
+            .frame(height: 22)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: urlPresetStatus)
         }
     }
 }
