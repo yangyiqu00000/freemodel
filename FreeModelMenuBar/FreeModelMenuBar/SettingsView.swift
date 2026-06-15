@@ -1134,6 +1134,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                             TextField("38440", text: $routerPort)
                                 .textFieldStyle(.roundedBorder)
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerPort) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                                 .frame(width: 80)
                         }
                         
@@ -1143,6 +1144,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                             TextField("codex-mini", text: $routerRouteModel)
                                 .textFieldStyle(.roundedBorder)
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerRouteModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                         }
                     }
 
@@ -1152,6 +1154,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
                             .textFieldStyle(.roundedBorder)
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerUpstreamURL) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -1160,6 +1163,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         TextField("deepseek-chat", text: $routerDefaultModel)
                             .textFieldStyle(.roundedBorder)
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerDefaultModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                     }
 
                     HStack(spacing: 12) {
