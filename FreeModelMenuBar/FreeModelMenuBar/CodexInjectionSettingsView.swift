@@ -245,6 +245,32 @@ struct CodexInjectionSettingsView: View {
             .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
         }
     }
+
+    // MARK: - "已自动保存" 反馈辅助
+
+    private static let autoSavedTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    private func triggerAutoSaveToast() {
+        autoSavedAt = Date()
+    }
+
+    private func autoSavedBadge(at date: Date) -> some View {
+        Label("已自动保存 · \(Self.autoSavedTimeFormatter.string(from: date))",
+            systemImage: "checkmark.seal.fill")
+            .font(.caption)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.blue.opacity(0.12))
+            )
+            .foregroundStyle(.blue)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
+    }
 }
 // MARK: - 自适应高度 TextEditor
 
@@ -274,34 +300,6 @@ struct AutoResizingTextEditor: View {
                 .frame(minHeight: minHeight, maxHeight: maxHeight)
                 .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    // MARK: - "已自动保存" 反馈辅助
-
-    private static let autoSavedTimeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
-    @MainActor
-    private func triggerAutoSaveToast() {
-        autoSavedAt = Date()
-    }
-
-    @MainActor
-    private func autoSavedBadge(at date: Date) -> some View {
-        Label("已自动保存 · \(Self.autoSavedTimeFormatter.string(from: date))",
-            systemImage: "checkmark.seal.fill")
-            .font(.caption)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.blue.opacity(0.12))
-            )
-            .foregroundStyle(.blue)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
     }
 
 }
