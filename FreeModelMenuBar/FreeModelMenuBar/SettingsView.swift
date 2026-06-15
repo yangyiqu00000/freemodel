@@ -60,10 +60,10 @@ private enum AddKind { case account, codex }
     @State private var pendingDeleteAccount: ProviderAccount? = nil
     @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
 
-    // 详情区 DisclosureGroup 展开状态
+    // 详情区 3 段展开状态（已全部默认展开：3 段是平等逻辑，不再折叠）
     @State private var isAccountGroupExpanded: Bool = true
     @State private var isConnectionGroupExpanded: Bool = true
-    @State private var isRouterGroupExpanded: Bool = false
+    @State private var isRouterGroupExpanded: Bool = true
 
     // 日志清除 toast
     @State private var logsClearedToast: String? = nil
@@ -103,36 +103,29 @@ private enum AddKind { case account, codex }
                             if let account = accountManager.accounts.first(where: { $0.id == accountID }) {
                                 header
 
-                                DisclosureGroup(isExpanded: $isAccountGroupExpanded) {
-                                    VStack(alignment: .leading, spacing: 18) {
-                                        accountDetails(account)
-                                        queryModeSection(account)
-                                        linksSection(account)
-                                    }
-                                } label: {
-                                    Label("账号", systemImage: "person.text.rectangle")
-                                        .font(.headline)
+                                // 3 段平等逻辑：始终展开，用 Label + Divider 分段（不再折叠）
+                                sectionHeader("账号", systemImage: "person.text.rectangle")
+                                VStack(alignment: .leading, spacing: 18) {
+                                    accountDetails(account)
+                                    queryModeSection(account)
+                                    linksSection(account)
                                 }
 
-                                DisclosureGroup(isExpanded: $isConnectionGroupExpanded) {
-                                    VStack(alignment: .leading, spacing: 18) {
-                                        dashboardSection(account)
-                                        apiKeySection(account)
-                                    }
-                                } label: {
-                                    Label("连接", systemImage: "link")
-                                        .font(.headline)
+                                Divider().padding(.vertical, 4)
+
+                                sectionHeader("连接", systemImage: "link")
+                                VStack(alignment: .leading, spacing: 18) {
+                                    dashboardSection(account)
+                                    apiKeySection(account)
                                 }
 
-                                DisclosureGroup(isExpanded: $isRouterGroupExpanded) {
-                                    VStack(alignment: .leading, spacing: 18) {
-                                        routerSection(account)
-                                        customURLsSection(account)
-                                        refreshSection
-                                    }
-                                } label: {
-                                    Label("路由", systemImage: "arrow.triangle.2.circlepath")
-                                        .font(.headline)
+                                Divider().padding(.vertical, 4)
+
+                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath")
+                                VStack(alignment: .leading, spacing: 18) {
+                                    routerSection(account)
+                                    customURLsSection(account)
+                                    refreshSection
                                 }
                             } else {
                                 emptyState
@@ -1617,6 +1610,14 @@ private enum AddKind { case account, codex }
         case .portInUse: return "端口被占用"
         case .missingKey: return "缺少 API Key"
         }
+    }
+
+    // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    private func sectionHeader(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.headline)
+            .padding(.top, 4)
     }
 
     // MARK: - 路由状态颜色（顶栏 / 详情区 / 日志行 共用单一来源）
