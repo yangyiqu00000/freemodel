@@ -476,7 +476,7 @@ private enum AddKind { case account, codex }
     private var accountsInlineAddRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("名称").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                fieldLabel("名称")
                 TextField("例如：我的 DeepSeek", text: $newAccountLabel)
                     .textFieldStyle(.roundedBorder)
             }
@@ -560,12 +560,12 @@ private enum AddKind { case account, codex }
     private var codexInlineAddRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("标签").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                fieldLabel("标签")
                 TextField("例如：本地 relay", text: $newCodexLabel)
                     .textFieldStyle(.roundedBorder)
             }
             HStack {
-                Text("Provider").frame(width: 56, alignment: .leading).font(.caption).foregroundStyle(.secondary)
+                fieldLabel("Provider")
                 TextField("例如：local-relay", text: $newCodexProvider)
                     .textFieldStyle(.roundedBorder)
             }
@@ -1810,6 +1810,14 @@ private enum AddKind { case account, codex }
     }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    /// 内联添加行字段标签：56pt 固定宽 + caption 灰底（与右侧 TextField 对齐），3 处共用
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text)
+            .frame(width: 56, alignment: .leading)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
 
     /// 侧边栏 section header（Label + headline + trailing 可选 + button），3 处共用
     private func sidebarSectionHeader(title: String, systemImage: String, trailing: AnyView?) -> some View {
