@@ -102,7 +102,7 @@ struct CodexInjectionSettingsView: View {
 
     private func labelsAndProvider(_ cfg: InjectionConfiguration) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text("标签").font(.caption).foregroundStyle(.secondary)
                     if cfg.label != initialLabel {
@@ -112,7 +112,7 @@ struct CodexInjectionSettingsView: View {
                             appLayer.updateConfiguration(copy)
                         } label: {
                             Image(systemName: "arrow.uturn.backward.circle")
-                                .font(.caption)
+                                .imageScale(.small)
                         }
                         .buttonStyle(.borderless)
                         .help("还原为本条配置创建时的标签")
@@ -127,9 +127,10 @@ struct CodexInjectionSettingsView: View {
                     }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
+                .controlSize(.regular)
+                .frame(maxWidth: 220, minHeight: 28)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text("Provider").font(.caption).foregroundStyle(.secondary)
                     if cfg.providerID != initialProviderID {
@@ -139,7 +140,7 @@ struct CodexInjectionSettingsView: View {
                             appLayer.updateConfiguration(copy)
                         } label: {
                             Image(systemName: "arrow.uturn.backward.circle")
-                                .font(.caption)
+                                .imageScale(.small)
                         }
                         .buttonStyle(.borderless)
                         .help("还原为本条配置创建时的 Provider")
@@ -154,7 +155,8 @@ struct CodexInjectionSettingsView: View {
                     }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
+                .controlSize(.regular)
+                .frame(maxWidth: 220, minHeight: 28)
             }
             Spacer()
         }
