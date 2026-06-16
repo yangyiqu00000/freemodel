@@ -509,7 +509,7 @@ private enum AddKind { case account, codex }
 
     private var codexSectionHeader: some View {
         HStack {
-            Label("Codex 注入", systemImage: "key.horizontal")
+            Label("Codex 注入", systemImage: "key.horizontal.fill")
                 .font(.headline)
             Spacer()
             Button {
