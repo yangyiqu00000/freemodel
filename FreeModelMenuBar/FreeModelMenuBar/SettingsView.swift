@@ -117,11 +117,6 @@ private enum AddKind { case account, codex }
     @State private var renameInput: String = ""
     @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
 
-    // 详情区 3 段展开状态（已全部默认展开：3 段是平等逻辑，不再折叠）
-    @State private var isAccountGroupExpanded: Bool = true
-    @State private var isConnectionGroupExpanded: Bool = true
-    @State private var isRouterGroupExpanded: Bool = true
-
     // 日志清除 toast
     @State private var logsClearedToast: String? = nil
     @State private var pendingScrollToAPIKey: Bool = false
