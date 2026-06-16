@@ -622,9 +622,7 @@ private enum AddKind { case account, codex }
                 }
                 Spacer(minLength: 4)
                 if let statusColor {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 7, height: 7)
+                    statusDot(color: statusColor, size: 7)
                 }
             }
             .padding(.vertical, 3)
@@ -1347,9 +1345,7 @@ private enum AddKind { case account, codex }
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let dot = headerStatusDot {
-                        Circle()
-                            .fill(dot)
-                            .frame(width: 6, height: 6)
+                        statusDot(color: dot)
                     }
                 }
             }
@@ -1856,9 +1852,7 @@ private enum AddKind { case account, codex }
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let color = dotColor {
-                        Circle()
-                            .fill(color)
-                            .frame(width: 6, height: 6)
+                        statusDot(color: color)
                     }
                 }
             }
@@ -1871,9 +1865,7 @@ private enum AddKind { case account, codex }
                 .font(.headline)
             Spacer()
             if let color = statusColor {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
+                statusDot(color: color, size: 8)
                     .help(headerDotHelp(for: title))
             }
         }

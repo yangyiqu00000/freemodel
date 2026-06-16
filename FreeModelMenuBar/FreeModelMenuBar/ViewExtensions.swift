@@ -13,6 +13,13 @@ extension View {
     func sectionDivider() -> some View {
         Divider().padding(.vertical, 4)
     }
+
+    /// 状态指示圆点（size: 6/7/8，4 处共用，保留 3 种 size 表视觉层次：侧栏小 6 / dashboard 中 7 / 段 header 大 8）
+    func statusDot(color: Color, size: CGFloat = 6) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+    }
 }
 
 extension Binding where Value == Bool {
