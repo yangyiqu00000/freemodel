@@ -21,6 +21,7 @@
 ./CodexInjector/ProviderLayer/ProviderCatalogStore.swift
 ./CodexInjector/ProviderLayer/ProviderLayer.swift
 ./ClipboardHelper.swift
+./CodeEditorView.swift
 ./FreeModelDashboardParser.swift
 ./FreeModelMenuBarApp.swift
 ./FreeModelTypes.swift

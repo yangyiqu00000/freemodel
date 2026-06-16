@@ -182,7 +182,7 @@ struct CodexInjectionSettingsView: View {
             } else {
                 Text("auth.json (\(cfg.authJSON.count) 字符)").font(.caption).foregroundStyle(.secondary)
             }
-            AutoResizingTextEditor(
+            CodeEditorView(
                 text: Binding(
                     get: { cfg.authJSON },
                     set: { newValue in
@@ -191,13 +191,13 @@ struct CodexInjectionSettingsView: View {
                         appLayer.updateConfiguration(copy)
                     }
                 ),
-                placeholder: "{ }",
+                language: .json,
                 minHeight: 60,
                 maxHeight: 320
             )
 
             Text("config.toml (\(cfg.configTOML.count) 字符)").font(.caption).foregroundStyle(.secondary)
-            AutoResizingTextEditor(
+            CodeEditorView(
                 text: Binding(
                     get: { cfg.configTOML },
                     set: { newValue in
@@ -206,7 +206,7 @@ struct CodexInjectionSettingsView: View {
                         appLayer.updateConfiguration(copy)
                     }
                 ),
-                placeholder: "# TOML",
+                language: .toml,
                 minHeight: 60,
                 maxHeight: 320
             )
@@ -282,102 +282,4 @@ struct CodexInjectionSettingsView: View {
         .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
     }
 }
-// MARK: - 自适应高度 TextEditor（带行号栏 + 代码主题）
-
-/// 代码主题（与 logs console 黑色风格统一；预留 light 给未来扩展）
-enum CodeEditorTheme {
-    case dark
-    case light
-
-    var background: Color {
-        switch self {
-        case .dark: return Color.black
-        case .light: return Color.gray.opacity(0.06)
-        }
-    }
-
-    var foreground: Color {
-        switch self {
-        case .dark: return Color.white
-        case .light: return Color.primary
-        }
-    }
-
-    /// 行号栏颜色（与背景同色系但稍弱）
-    var gutterBackground: Color {
-        switch self {
-        case .dark: return Color.black.opacity(0.85)
-        case .light: return Color.gray.opacity(0.04)
-        }
-    }
-
-    var gutterForeground: Color {
-        switch self {
-        case .dark: return Color.white.opacity(0.45)
-        case .light: return Color.secondary
-        }
-    }
-
-    var border: Color {
-        switch self {
-        case .dark: return Color.gray.opacity(0.4)
-        case .light: return Color.gray.opacity(0.25)
-        }
-    }
-}
-
-struct AutoResizingTextEditor: View {
-    @Binding var text: String
-    var placeholder: String
-    var minHeight: CGFloat = 60
-    var maxHeight: CGFloat = 320
-    var theme: CodeEditorTheme = .dark
-    var showLineNumbers: Bool = true
-
-    /// 当前行数（按 \n 切，最后一个空行也算 1 行；跟 TextEditor 视觉一致）
-    private var lineCount: Int {
-        max(1, text.components(separatedBy: "\n").count)
-    }
-
-    /// 行号文本（"1\n2\n...\nN"，右对齐）
-    private var gutterText: String {
-        (1...lineCount).map(String.init).joined(separator: "\n")
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            if showLineNumbers {
-                Text(gutterText)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(theme.gutterForeground)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 32, alignment: .trailing)
-                    .padding(.vertical, 8)
-                    .background(theme.gutterBackground)
-                    .allowsHitTesting(false)
-            }
-            ZStack(alignment: .topLeading) {
-                if text.isEmpty {
-                    Text(placeholder)
-                        .foregroundStyle(theme == .dark ? Color.white.opacity(0.4) : Color.secondary.opacity(0.6))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-                        .allowsHitTesting(false)
-                }
-                TextEditor(text: $text)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(theme.foreground)
-                    .scrollContentBackground(.hidden)
-                    .background(theme.background)
-                    .frame(minHeight: minHeight, maxHeight: maxHeight)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(theme.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-}
+// CodeEditorView 移到了独立文件 CodeEditorView.swift（NSTextView + NSAttributedString 语法高亮 + 行号 ruler + 浅灰主题 + 外框）
