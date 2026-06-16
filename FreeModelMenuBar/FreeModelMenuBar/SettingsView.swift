@@ -271,11 +271,7 @@ private enum AddKind { case account, codex }
             presenting: pendingDeleteAccount
         ) { acct in
             Button("删除 “\(acct.displayName)”", role: .destructive) {
-                _ = accountManager.deleteAccount(id: acct.id)
-                balanceManager.syncFromActiveAccount()
-                if case .account(let id) = selectedItem, id == acct.id {
-                    selectedItem = nil
-                }
+                deleteAccountAndSync(id: acct.id, clearDetailFields: false)
                 pendingDeleteAccount = nil
             }
             Button("取消", role: .cancel) {
@@ -1086,9 +1082,7 @@ private enum AddKind { case account, codex }
 
     private func deleteActiveAccount() {
         guard let account = accountManager.activeAccount else { return }
-        _ = accountManager.deleteAccount(id: account.id)
-        apiKeyInput = ""
-        balanceManager.syncFromActiveAccount()
+        deleteAccountAndSync(id: account.id, clearDetailFields: true)
     }
 
     private func accountStatusText(_ account: ProviderAccount) -> String {
@@ -1883,6 +1877,19 @@ private enum AddKind { case account, codex }
     private func openURL(_ string: String) {
         if let url = URL(string: string) {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - 删除账号并同步 UI 状态（detail 字段清空开关可选，2 处共用）
+
+    private func deleteAccountAndSync(id: UUID, clearDetailFields: Bool) {
+        _ = accountManager.deleteAccount(id: id)
+        balanceManager.syncFromActiveAccount()
+        if clearDetailFields {
+            apiKeyInput = ""
+        }
+        if case .account(let selID) = selectedItem, selID == id {
+            selectedItem = nil
         }
     }
 
