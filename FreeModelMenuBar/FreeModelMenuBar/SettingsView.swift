@@ -1602,9 +1602,7 @@ private enum AddKind { case account, codex }
                 .disabled(routerManager.logs.isEmpty)
 
                 if let toast = logsClearedToast {
-                    Text(toast)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    StatusBadge(icon: "trash.fill", text: toast, tint: .secondary)
                         .transition(.opacity)
                 }
                 Spacer()
