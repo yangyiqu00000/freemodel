@@ -426,8 +426,7 @@ struct MenuContent: View {
                 
                 if routerManager.status == .running {
                     Button(action: {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString("http://127.0.0.1:\(settings.port)/v1", forType: .string)
+                        ClipboardHelper.shared.copy("http://127.0.0.1:\(settings.port)/v1")
                     }) {
                         Image(systemName: "doc.on.doc.fill")
                             .font(.system(size: 10))

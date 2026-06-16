@@ -20,6 +20,7 @@
 ./CodexInjector/ProviderLayer/Provider.swift
 ./CodexInjector/ProviderLayer/ProviderCatalogStore.swift
 ./CodexInjector/ProviderLayer/ProviderLayer.swift
+./ClipboardHelper.swift
 ./FreeModelDashboardParser.swift
 ./FreeModelMenuBarApp.swift
 ./FreeModelTypes.swift

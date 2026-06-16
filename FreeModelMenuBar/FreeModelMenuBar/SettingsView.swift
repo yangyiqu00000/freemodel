@@ -376,20 +376,17 @@ private enum AddKind { case account, codex }
                     Label("重命名", systemImage: "pencil")
                 }
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(account.displayName, forType: .string)
+                    ClipboardHelper.shared.copy(account.displayName)
                 } label: {
                     Label("复制账号名", systemImage: "doc.on.doc.fill")
                 }
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(account.providerID, forType: .string)
+                    ClipboardHelper.shared.copy(account.providerID)
                 } label: {
                     Label("复制 Provider", systemImage: "doc.on.doc.fill")
                 }
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(account.id.uuidString, forType: .string)
+                    ClipboardHelper.shared.copy(account.id.uuidString)
                 } label: {
                     Label("复制账号 ID", systemImage: "doc.on.doc.fill")
                 }
@@ -415,14 +412,12 @@ private enum AddKind { case account, codex }
             .tag(SidebarItem.codexInjectionConfig(cfg.id))
             .contextMenu {
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(cfg.label, forType: .string)
+                    ClipboardHelper.shared.copy(cfg.label)
                 } label: {
                     Label("复制 label", systemImage: "doc.on.doc.fill")
                 }
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(cfg.providerID, forType: .string)
+                    ClipboardHelper.shared.copy(cfg.providerID)
                 } label: {
                     Label("复制 Provider", systemImage: "doc.on.doc.fill")
                 }
@@ -1577,8 +1572,7 @@ private enum AddKind { case account, codex }
                     let portVal = activeAccount.activeRouterSettings.port
                     let urlString = "http://127.0.0.1:\(portVal)/v1"
                     Button(action: {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(urlString, forType: .string)
+                        ClipboardHelper.shared.copy(urlString)
                         triggerBaseURLCopiedToast()
                     }) {
                         Label("复制 Base URL", systemImage: "doc.on.doc.fill")
@@ -1688,8 +1682,7 @@ private enum AddKind { case account, codex }
                                         }
                                         if let err = log.error, !err.isEmpty {
                                             Button("复制错误详情") {
-                                                NSPasteboard.general.clearContents()
-                                                NSPasteboard.general.setString(err, forType: .string)
+                                                ClipboardHelper.shared.copy(err)
                                             }
                                         }
                                     }
@@ -1719,8 +1712,7 @@ private enum AddKind { case account, codex }
             }
             text = mainLog
         }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        ClipboardHelper.shared.copy(text)
     }
 
     private func clearLogsWithToast() {
@@ -1770,8 +1762,7 @@ private enum AddKind { case account, codex }
             }
         }
         let allLogs = logTexts.joined(separator: "\n")
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(allLogs, forType: .string)
+        ClipboardHelper.shared.copy(allLogs)
     }
 
     // MARK: - 路由状态文本（侧边栏日志行 + 详情区 header 共用）
