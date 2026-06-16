@@ -1708,12 +1708,16 @@ private enum AddKind { case account, codex }
                     Label("复制所有日志", systemImage: "doc.on.doc.fill")
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .disabled(routerManager.logs.isEmpty)
 
                 Button(action: clearLogsWithToast) {
                     Label("清除日志", systemImage: "trash.fill")
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .disabled(routerManager.logs.isEmpty)
 
                 if let toast = logsClearedToast {
