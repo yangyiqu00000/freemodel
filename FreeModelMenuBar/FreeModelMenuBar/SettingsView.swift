@@ -635,7 +635,7 @@ private enum AddKind { case account, codex }
                 }
                 Spacer(minLength: 4)
                 if let statusColor {
-                    statusDot(color: statusColor, size: 7)
+                    statusDot(color: statusColor, size: 7, help: "账号段：当前账号信息已配置")
                 }
             }
             .padding(.vertical, 3)
@@ -1379,7 +1379,7 @@ private enum AddKind { case account, codex }
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let dot = headerStatusDot {
-                        statusDot(color: dot)
+                        statusDot(color: dot, help: "路由代理状态")
                     }
                 }
             }
@@ -1909,7 +1909,7 @@ private enum AddKind { case account, codex }
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let color = dotColor {
-                        statusDot(color: color)
+                        statusDot(color: color, help: "路由代理状态")
                     }
                 }
             }
@@ -1922,8 +1922,7 @@ private enum AddKind { case account, codex }
                 .font(.headline)
             Spacer()
             if let color = statusColor {
-                statusDot(color: color, size: 8)
-                    .help(headerDotHelp(for: title))
+                statusDot(color: color, size: 8, help: headerDotHelp(for: title))
             }
         }
         .padding(.top, 4)
