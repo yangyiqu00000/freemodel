@@ -467,7 +467,7 @@ private enum AddKind { case account, codex }
                 Image(systemName: addExpanded == .account ? "minus" : "plus")
             }
             .buttonStyle(.borderless)
-            .help("新增账号")
+            .help(addExpanded == .account ? "收起添加账号行" : "新增账号")
         }
     }
     // MARK: - 内联账号添加行（与 codexInlineAddRow 同形状）
@@ -550,7 +550,7 @@ private enum AddKind { case account, codex }
                 Image(systemName: addExpanded == .codex ? "minus" : "plus")
             }
             .buttonStyle(.borderless)
-            .help("添加一条新的注入配置")
+            .help(addExpanded == .codex ? "收起添加注入配置行" : "添加一条新的注入配置")
         }
     }
     // MARK: - 内联添加行（替代 sheet）
