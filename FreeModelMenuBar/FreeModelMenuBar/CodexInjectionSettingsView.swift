@@ -86,15 +86,22 @@ struct CodexInjectionSettingsView: View {
     @ViewBuilder
     private func activeStatusBadge(_ cfg: InjectionConfiguration) -> some View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
-        if isActive {
-            Label("已激活", systemImage: "checkmark.circle.fill")
-                .font(.caption)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.green.opacity(0.15))
-                )
-                .foregroundStyle(.green)
+        if isActive, let activatedAt = appLayer.activeInjection?.activatedAt {
+            // 激活态：显示激活时间，让用户看到"激活多久了"——比单字"已激活"信息密度高
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                Text("已激活")
+                Text("·").foregroundStyle(.secondary)
+                Text(activatedAt, style: .time)
+            }
+            .font(.caption)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.green.opacity(0.15))
+            )
+            .foregroundStyle(.green)
+            .help("激活于 \(activatedAt.formatted(date: .abbreviated, time: .standard))")
         } else {
             Label("未激活", systemImage: "circle.dashed")
                 .font(.caption)
