@@ -14,3 +14,14 @@ extension View {
         Divider().padding(.vertical, 4)
     }
 }
+
+extension Binding where Value == Bool {
+    /// Optional State → Bool Binding（get: nil? false ; set: true → 不变, false → 置 nil），3 处共用
+    /// 用于 alert/.confirmationDialog 的 isPresented 绑定 optional 状态
+    static func nilify<T>(_ state: Binding<T?>) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { state.wrappedValue != nil },
+            set: { if !$0 { state.wrappedValue = nil } }
+        )
+    }
+}

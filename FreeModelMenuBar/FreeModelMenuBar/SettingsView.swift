@@ -262,10 +262,7 @@ private enum AddKind { case account, codex }
         }
         .confirmationDialog(
             "确定删除账号 “\(pendingDeleteAccount?.displayName ?? "")” ？",
-            isPresented: Binding(
-                get: { pendingDeleteAccount != nil },
-                set: { if !$0 { pendingDeleteAccount = nil } }
-            ),
+            isPresented: .nilify($pendingDeleteAccount),
             titleVisibility: .visible,
             presenting: pendingDeleteAccount
         ) { acct in
@@ -281,10 +278,7 @@ private enum AddKind { case account, codex }
         }
         .alert(
             "重命名账号",
-            isPresented: Binding(
-                get: { pendingRenameAccount != nil },
-                set: { if !$0 { pendingRenameAccount = nil } }
-            ),
+            isPresented: .nilify($pendingRenameAccount),
             presenting: pendingRenameAccount
         ) { acct in
             TextField("新名称", text: $renameInput)
@@ -301,10 +295,7 @@ private enum AddKind { case account, codex }
         }
         .confirmationDialog(
             "确定删除注入配置 “\(pendingDeleteCodexConfig?.label ?? "")” ？",
-            isPresented: Binding(
-                get: { pendingDeleteCodexConfig != nil },
-                set: { if !$0 { pendingDeleteCodexConfig = nil } }
-            ),
+            isPresented: .nilify($pendingDeleteCodexConfig),
             titleVisibility: .visible,
             presenting: pendingDeleteCodexConfig
         ) { cfg in
