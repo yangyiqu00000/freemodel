@@ -124,6 +124,12 @@ private enum AddKind { case account, codex }
     // 复制 Base URL toast
     @State private var baseURLCopiedToast: String? = nil
     @State private var baseURLCopiedToastToken: Int = 0
+    // 添加账号 toast（账号 4 chip 共用）
+    @State private var accountCreatedToast: String? = nil
+    @State private var accountCreatedToastToken: Int = 0
+    // 添加 Codex 注入 toast（官方 / 第三方 共用）
+    @State private var codexConfigCreatedToast: String? = nil
+    @State private var codexConfigCreatedToastToken: Int = 0
 
     // Router State
     @State private var initialRouterEnabled: Bool = false
@@ -163,6 +169,15 @@ private enum AddKind { case account, codex }
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                    // 添加成功 toast（3 处共用：账号 4 chip / Codex 官方 / Codex 第三方）
+                    if let toast = accountCreatedToast {
+                        StatusBadge(icon: "person.crop.circle.badge.checkmark", text: toast, tint: .green)
+                            .transition(.opacity)
+                    }
+                    if let toast = codexConfigCreatedToast {
+                        StatusBadge(icon: "key.horizontal.fill", text: toast, tint: .blue)
+                            .transition(.opacity)
+                    }
                     if let selected = selectedItem {
                         switch selected {
                         case .account(let accountID):
@@ -474,25 +489,25 @@ private enum AddKind { case account, codex }
                     GridItem(.flexible(), spacing: 6)
                 ], spacing: 6) {
                     Button {
-                        commitAccountCreation(providerID: "freemodel")
+                        commitAccountCreation(providerID: "freemodel", providerDisplayName: "FreeModel 网页")
                     } label: {
                         Label("FreeModel 网页", systemImage: "globe")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        commitAccountCreation(providerID: "deepseek")
+                        commitAccountCreation(providerID: "deepseek", providerDisplayName: "DeepSeek API")
                     } label: {
                         Label("DeepSeek API", systemImage: "key.fill")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        commitAccountCreation(providerID: "openrouter")
+                        commitAccountCreation(providerID: "openrouter", providerDisplayName: "OpenRouter API")
                     } label: {
                         Label("OpenRouter API", systemImage: "arrow.triangle.branch")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        commitAccountCreation(providerID: "modelscope")
+                        commitAccountCreation(providerID: "modelscope", providerDisplayName: "ModelScope API")
                     } label: {
                         Label("ModelScope API", systemImage: "cube")
                             .frame(maxWidth: .infinity)
@@ -552,6 +567,10 @@ private enum AddKind { case account, codex }
                     Button {
                         codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
                         addExpanded = nil
+                        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
+                            selectedItem = .codexInjectionConfig(newID)
+                        }
+                        addSuccessToast(value: $codexConfigCreatedToast, token: $codexConfigCreatedToastToken, message: "已添加：\(newCodexLabel) · 官方")
                     } label: {
                         Label("官方", systemImage: "person.crop.circle.badge.checkmark")
                             .frame(maxWidth: .infinity)
@@ -559,6 +578,10 @@ private enum AddKind { case account, codex }
                     Button {
                         codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
                         addExpanded = nil
+                        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
+                            selectedItem = .codexInjectionConfig(newID)
+                        }
+                        addSuccessToast(value: $codexConfigCreatedToast, token: $codexConfigCreatedToastToken, message: "已添加：\(newCodexLabel) · 第三方")
                     } label: {
                         Label("第三方", systemImage: "square.and.pencil")
                             .frame(maxWidth: .infinity)
@@ -1760,6 +1783,16 @@ private enum AddKind { case account, codex }
 
     // MARK: - Toast 自动隐藏（token 模式防过期复活，3 处共用：logsCleared / baseURLCopied / urlPresetStatus）
 
+    /// 添加成功 toast：3 处共用（账号 4 chip / Codex 官方 / Codex 第三方）
+    private func addSuccessToast(
+        value: Binding<String?>,
+        token: Binding<Int>,
+        message: String
+    ) {
+        value.wrappedValue = message
+        autoHideToast(token: token, value: value)
+    }
+
     /// toast 自动 3 秒后置 nil。token 自增 + 异步检查 token 防止用户在 3 秒内再次触发时旧 timer 复活旧 toast
     private func autoHideToast<T: Equatable>(token: Binding<Int>, value: Binding<T?>, seconds: Double = 3.0) {
         token.wrappedValue &+= 1
@@ -1931,10 +1964,11 @@ private enum AddKind { case account, codex }
 
     // MARK: - 创建账号并选为活跃（4 个 provider chip 共用，1 行调用）
 
-    private func commitAccountCreation(providerID: String) {
+    private func commitAccountCreation(providerID: String, providerDisplayName: String) {
         let account = accountManager.createAccount(displayName: newAccountLabel, providerID: providerID)
         selectAccountAndSync(id: account.id)
         addExpanded = nil
+        addSuccessToast(value: $accountCreatedToast, token: $accountCreatedToastToken, message: "已添加：\(account.displayName) · \(providerDisplayName)")
     }
 
     // MARK: - 重命名账号提交（trim + 非空 + renameAccount 同一来源，3 处共用）
