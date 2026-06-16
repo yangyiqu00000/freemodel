@@ -1038,16 +1038,12 @@ private enum AddKind { case account, codex }
 
             HStack(spacing: 12) {
                 Button("打开 \(providerName) 控制面板") {
-                    if let url = URL(string: account.dashboardURL) {
-                        NSWorkspace.shared.open(url)
-                    }
+                    openURL(account.dashboardURL)
                 }
                 .buttonStyle(.bordered)
 
                 Button("API 文档") {
-                    if let url = URL(string: docURLString) {
-                        NSWorkspace.shared.open(url)
-                    }
+                    openURL(docURLString)
                 }
                 .buttonStyle(.bordered)
             }
@@ -1880,6 +1876,14 @@ private enum AddKind { case account, codex }
     private func routerHeaderStatusColor() -> Color? {
         // 路由段：复用 routerStatusColor
         return routerStatusColor(routerManager.status)
+    }
+
+    // MARK: - URL 打开（if let URL + NSWorkspace.open 同一来源，3 处共用）
+
+    private func openURL(_ string: String) {
+        if let url = URL(string: string) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     // MARK: - 创建账号并选为活跃（4 个 provider chip 共用，1 行调用）
