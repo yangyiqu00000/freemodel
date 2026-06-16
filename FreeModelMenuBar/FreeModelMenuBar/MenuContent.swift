@@ -191,14 +191,13 @@ struct MenuContent: View {
     private var noAccountView: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 32))
+                .font(.system(size: 36))
                 .foregroundStyle(.orange)
 
             Text("还没有账号")
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .font(.headline)
 
-            Text("点击「设置」添加 FreeModel 账号")
+            Text("点击侧边栏右上角的 + 添加账号")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

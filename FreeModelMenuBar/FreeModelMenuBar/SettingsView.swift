@@ -797,15 +797,17 @@ private enum AddKind { case account, codex }
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 42))
+                .font(.system(size: 36))
                 .foregroundStyle(.orange)
             Text("还没有账号")
                 .font(.headline)
             Text("点击侧边栏右上角的 + 添加账号")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, minHeight: 360)
+        .padding(24)
     }
 
     private func accountDetails(_ account: ProviderAccount) -> some View {
