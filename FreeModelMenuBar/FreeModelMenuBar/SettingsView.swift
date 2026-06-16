@@ -95,6 +95,7 @@ private enum AddKind { case account, codex }
         let message: String
     }
     @State private var urlPresetStatus: UrlPresetStatus? = nil
+    @State private var urlPresetStatusToken: Int = 0
     @State private var renameText: String = ""
     @State private var initialDisplayName: String = ""
     @State private var apiURLInput: String = ""
@@ -1197,7 +1198,7 @@ private enum AddKind { case account, codex }
 
             Button("保存服务器地址") {
                 accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-                urlPresetStatus = UrlPresetStatus(success: true, message: "服务器地址已保存")
+                triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "服务器地址已保存"))
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
@@ -1248,7 +1249,7 @@ private enum AddKind { case account, codex }
         // 重新拉 @State
         loadFieldsFromActiveAccount()
         // 反馈
-        urlPresetStatus = UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设")
+        triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设"))
     }
 
     private func applyRouterPreset(for accountID: UUID, upstreamURL: String, defaultModel: String) {
@@ -1875,6 +1876,19 @@ private enum AddKind { case account, codex }
             )
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: urlPresetStatus)
+        }
+    }
+
+    private func triggerUrlPresetStatus(_ status: UrlPresetStatus) {
+        urlPresetStatus = status
+        // 3 秒后自动隐藏（与 logsClearedToast / baseURLCopiedToast 同模式，token 防过期 toast 复活）
+        urlPresetStatusToken &+= 1
+        let token = urlPresetStatusToken
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if urlPresetStatusToken == token {
+                withAnimation { urlPresetStatus = nil }
+            }
         }
     }
 }
