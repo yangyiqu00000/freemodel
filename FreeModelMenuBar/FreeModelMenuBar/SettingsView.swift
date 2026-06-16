@@ -827,8 +827,9 @@ private enum AddKind { case account, codex }
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            HStack(alignment: .center, spacing: 8) {
-                ZStack(alignment: .bottomTrailing) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    // 输入框（独立，无 overlay）
                     if showAPIKey {
                         TextField("sk-...", text: $apiKeyInput)
                             .textFieldStyle(.roundedBorder)
@@ -846,23 +847,32 @@ private enum AddKind { case account, codex }
                                 if case .saved = apiKeyStatus { apiKeyStatus = .unsaved }
                             }
                     }
+                    // 状态徽章：移出 overlay，改为输入框下方独立一行（视觉层级清晰）
                     apiKeyStatusBadge
-                        .padding(6)
                 }
 
-                Button(action: { showAPIKey.toggle() }) {
-                    Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                // 眼睛按钮 + 测试进度圈 — 控制 28pt 高与下方按钮行对齐
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Button(action: { showAPIKey.toggle() }) {
+                            Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                                .frame(width: 16, height: 16)
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.regular)
                         .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.borderless)
-                .disabled(isTesting)
-                .help(showAPIKey ? "隐藏 API Key" : "显示 API Key")
+                        .disabled(isTesting)
+                        .help(showAPIKey ? "隐藏 API Key" : "显示 API Key")
 
-                if isTesting {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                        .frame(width: 28, height: 28)
-                        .help("正在测试连接")
+                        if isTesting {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .frame(width: 28, height: 28)
+                                .help("正在测试连接")
+                        }
+                    }
+                    // 占位，与左侧 apiKeyStatusBadge 对齐（保持两列顶部对齐）
+                    Color.clear.frame(height: 22)
                 }
             }
 
