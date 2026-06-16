@@ -1609,7 +1609,8 @@ private enum AddKind { case account, codex }
                     }
                 }
                 Spacer()
-                if routerManager.status == .running, let activeAccount = accountManager.activeAccount {
+                if let activeAccount = accountManager.activeAccount {
+                    let isRunning = routerManager.status == .running
                     Button(action: {
                         NSPasteboard.general.clearContents()
                         let portVal = activeAccount.activeRouterSettings.port
@@ -1619,6 +1620,8 @@ private enum AddKind { case account, codex }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(!isRunning)
+                    .help(isRunning ? "复制 http://127.0.0.1:\(activeAccount.activeRouterSettings.port)/v1 到剪贴板" : "启动路由代理后才可复制 Base URL")
                 }
             }
 
