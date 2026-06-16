@@ -393,7 +393,7 @@ private enum AddKind { case account, codex }
                         accountManager.selectAccount(id: account.id)
                         balanceManager.syncFromActiveAccount()
                     } label: {
-                        Label("设为活跃账号", systemImage: "checkmark.circle")
+                        Label("设为活跃账号", systemImage: "checkmark.circle.fill")
                     }
                 }
                 Divider()
@@ -1749,7 +1749,7 @@ private enum AddKind { case account, codex }
             case .testing: return nil  // testing 期间 ProgressView 已经在外侧显示
             case .verified: return ("checkmark.seal.fill", .green, "已验证")
             case .failed(let msg): return ("xmark.octagon.fill", .red, msg)
-            case .saved: return ("checkmark.circle", .blue, "已保存")
+            case .saved: return ("checkmark.circle.fill", .blue, "已保存")
             }
         }()
         if let pair {
