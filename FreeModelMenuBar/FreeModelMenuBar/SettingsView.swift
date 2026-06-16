@@ -1870,7 +1870,7 @@ private enum AddKind { case account, codex }
         let pair: (icon: String, color: Color, text: String)? = {
             switch apiKeyStatus {
             case .empty: return nil
-            case .unsaved: return ("circle", .secondary, "未保存")
+            case .unsaved: return ("circle.dashed", .orange, "未保存")
             case .testing: return nil  // testing 期间 ProgressView 已经在外侧显示
             case .verified: return ("checkmark.seal.fill", .green, "已验证")
             case .failed(let msg): return ("xmark.octagon.fill", .red, msg)
