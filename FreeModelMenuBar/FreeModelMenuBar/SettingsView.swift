@@ -295,10 +295,7 @@ private enum AddKind { case account, codex }
             TextField("新名称", text: $renameInput)
                 .textFieldStyle(.roundedBorder)
             Button("保存") {
-                let trimmed = renameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    accountManager.renameAccount(id: acct.id, displayName: trimmed)
-                }
+                _ = commitRename(input: renameInput, accountID: acct.id)
                 pendingRenameAccount = nil
             }
             Button("取消", role: .cancel) {
@@ -808,16 +805,14 @@ private enum AddKind { case account, codex }
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: .infinity)
                     .onSubmit {
-                        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return }
-                        accountManager.renameAccount(id: account.id, displayName: trimmed)
-                        initialDisplayName = trimmed
+                        if commitRename(input: renameText, accountID: account.id) {
+                            initialDisplayName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
                     }
                 Button("重命名") {
-                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    accountManager.renameAccount(id: account.id, displayName: trimmed)
-                    initialDisplayName = trimmed
+                    if commitRename(input: renameText, accountID: account.id) {
+                        initialDisplayName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
                 }
                 .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 if renameText.trimmingCharacters(in: .whitespacesAndNewlines) != initialDisplayName
@@ -1897,6 +1892,16 @@ private enum AddKind { case account, codex }
     private func routerHeaderStatusColor() -> Color? {
         // 路由段：复用 routerStatusColor
         return routerStatusColor(routerManager.status)
+    }
+
+    // MARK: - 重命名账号提交（trim + 非空 + renameAccount 同一来源，3 处共用）
+
+    /// 提交账号重命名：trim 后非空才调 renameAccount。返回 true 表示已提交成功（详情页用于同步 initialDisplayName）
+    private func commitRename(input: String, accountID: UUID) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        accountManager.renameAccount(id: accountID, displayName: trimmed)
+        return true
     }
 
     // MARK: - 路由状态颜色（顶栏 / 详情区 / 日志行 共用单一来源）
