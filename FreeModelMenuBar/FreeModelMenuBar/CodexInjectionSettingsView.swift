@@ -4,9 +4,9 @@
 //
 //  单条注入配置的"详情区"。由 SettingsView 在右侧主区域渲染。
 //  不再有 sheet / popover / DisclosureGroup / swipeActions。
-//  顶部：标签 + Provider 两个文本框；右上角绿色「激活」/ 灰底「已激活 ✓」按钮。
-//  中间：auth.json + config.toml 两个自适应高度编辑框（官方配置在 auth.json 上方提供抓取链接）。
-//  底部：「恢复默认」按钮：清空 ~/.codex/auth.json + config.toml，回到初始 Codex 状态。
+//  顶部：label + 激活徽章（含激活时间）+ 已自动保存徽章。
+//  主体：标签 + Provider 两个文本框，附未保存还原按钮；auth.json + config.toml 两个自适应高度编辑框（官方配置在 auth.json 上方提供抓取链接）。
+//  底部：3 按钮（激活此配置 / 恢复默认 / 删除）等高对齐。
 //
 
 import SwiftUI
