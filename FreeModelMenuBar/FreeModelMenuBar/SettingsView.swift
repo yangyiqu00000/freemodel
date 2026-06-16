@@ -162,7 +162,7 @@ private enum AddKind { case account, codex }
 
                                 // 3 段平等逻辑：始终展开，用 Label + Divider 分段（不再折叠）
                                 sectionHeader("账号", systemImage: "person.text.rectangle", statusColor: accountHeaderStatusColor(account))
-                                VStack(alignment: .leading, spacing: 18) {
+                                sectionVStack {
                                     accountDetails(account)
                                     queryModeSection(account)
                                     linksSection(account)
@@ -171,7 +171,7 @@ private enum AddKind { case account, codex }
                                 Divider().padding(.vertical, 4)
 
                                 sectionHeader("连接", systemImage: "link", statusColor: connectionHeaderStatusColor(account))
-                                VStack(alignment: .leading, spacing: 18) {
+                                sectionVStack {
                                     dashboardSection(account)
                                     apiKeySection(account)
                                 }
@@ -179,7 +179,7 @@ private enum AddKind { case account, codex }
                                 Divider().padding(.vertical, 4)
 
                                 sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerHeaderStatusColor())
-                                VStack(alignment: .leading, spacing: 18) {
+                                sectionVStack {
                                     routerSection(account)
                                     customURLsSection(account)
                                     refreshSection
@@ -1939,6 +1939,11 @@ private extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
+    }
+
+    /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
+    func sectionVStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 16, content: content)
     }
 
     /// 侧边栏内联添加行背景（blue 6pt 圆角小卡片）——2 处统一使用（账号 + Codex 注入）
