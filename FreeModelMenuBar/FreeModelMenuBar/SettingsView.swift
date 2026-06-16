@@ -1603,7 +1603,7 @@ private enum AddKind { case account, codex }
                     let urlString = "http://127.0.0.1:\(portVal)/v1"
                     Button(action: {
                         ClipboardHelper.shared.copy(urlString)
-                        triggerBaseURLCopiedToast()
+                        addSuccessToast(value: $baseURLCopiedToast, token: $baseURLCopiedToastToken, message: "Base URL 已复制")
                     }) {
                         Label("复制 Base URL", systemImage: "doc.on.doc.fill")
                     }
@@ -1748,19 +1748,8 @@ private enum AddKind { case account, codex }
     private func clearLogsWithToast() {
         let count = routerManager.logs.count
         routerManager.logs.removeAll()
-        if count == 0 {
-            logsClearedToast = "当前无日志"
-        } else {
-            logsClearedToast = "已清除 \(count) 条日志"
-            // 3 秒后自动隐藏
-            autoHideToast(token: $logsClearedToastToken, value: $logsClearedToast)
-        }
-    }
-
-    private func triggerBaseURLCopiedToast() {
-        baseURLCopiedToast = "Base URL 已复制"
-        // 3 秒后自动隐藏
-        autoHideToast(token: $baseURLCopiedToastToken, value: $baseURLCopiedToast)
+        let message = count == 0 ? "当前无日志" : "已清除 \(count) 条日志"
+        addSuccessToast(value: $logsClearedToast, token: $logsClearedToastToken, message: message)
     }
 
     private func copyAllLogs() {
