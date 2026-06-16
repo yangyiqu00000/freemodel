@@ -1170,7 +1170,7 @@ private enum AddKind { case account, codex }
             Label("自定义服务器地址", systemImage: "network")
                 .font(.headline)
 
-            Text("要快速切换 provider（URL + 查询模式 + 路由 + 默认模型 一次性设齐）？请到下方「路由」段顶部选择预设。")
+            Text("要快速切换 provider（URL + 查询模式 + 路由 + 默认模型 一次性设齐）？请到上方「路由代理」开关下方的预设 chip。")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
