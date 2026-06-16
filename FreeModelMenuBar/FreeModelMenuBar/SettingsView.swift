@@ -1840,7 +1840,7 @@ private enum AddKind { case account, codex }
         case .starting: return "路由启动中…"
         case .running: return "路由运行中"
         case .failed: return "路由启动失败"
-        case .portInUse: return "端口被占用"
+        case .portInUse: return "端口占用"
         case .missingKey: return "请先配置 API Key"
         }
     }
