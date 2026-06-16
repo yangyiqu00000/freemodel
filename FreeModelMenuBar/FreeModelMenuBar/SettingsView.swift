@@ -170,14 +170,8 @@ private enum AddKind { case account, codex }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                     // 添加成功 toast（3 处共用：账号 4 chip / Codex 官方 / Codex 第三方）
-                    if let toast = accountCreatedToast {
-                        StatusBadge(icon: "person.crop.circle.badge.checkmark", text: toast, tint: .green)
-                            .transition(.opacity)
-                    }
-                    if let toast = codexConfigCreatedToast {
-                        StatusBadge(icon: "key.horizontal.fill", text: toast, tint: .blue)
-                            .transition(.opacity)
-                    }
+                    toastBadge(value: accountCreatedToast, icon: "person.crop.circle.badge.checkmark", tint: .green)
+                    toastBadge(value: codexConfigCreatedToast, icon: "key.horizontal.fill", tint: .blue)
                     if let selected = selectedItem {
                         switch selected {
                         case .account(let accountID):
@@ -1622,10 +1616,7 @@ private enum AddKind { case account, codex }
                     .controlSize(.small)
                     .disabled(!isRunning)
                     .help(isRunning ? "复制 \(urlString) 到剪贴板" : "启动路由代理后才可复制 Base URL")
-                    if let toast = baseURLCopiedToast {
-                        StatusBadge(icon: "doc.on.doc.fill", text: toast, tint: .blue)
-                            .transition(.opacity)
-                    }
+                    toastBadge(value: baseURLCopiedToast, icon: "doc.on.doc.fill", tint: .blue)
                 }
             }
 
@@ -1693,10 +1684,7 @@ private enum AddKind { case account, codex }
                 .frame(height: 28)
                 .disabled(routerManager.logs.isEmpty)
 
-                if let toast = logsClearedToast {
-                    StatusBadge(icon: "trash.fill", text: toast, tint: .secondary)
-                        .transition(.opacity)
-                }
+                toastBadge(value: logsClearedToast, icon: "trash.fill", tint: .secondary)
                 Spacer()
             }
 

@@ -14,6 +14,18 @@ extension View {
         Divider().padding(.vertical, 4)
     }
 
+    /// Toast 反馈徽章（4 处共用：accountCreated / codexConfigCreated / baseURLCopied / logsCleared）
+    /// - value: Optional String 状态（nil 不渲染）
+    /// - icon / tint: 徽章主色与 icon
+    /// 统一模板：if let + StatusBadge + .transition(.opacity)
+    @ViewBuilder
+    func toastBadge(value: String?, icon: String, tint: Color) -> some View {
+        if let text = value {
+            StatusBadge(icon: icon, text: text, tint: tint)
+                .transition(.opacity)
+        }
+    }
+
     /// 状态指示圆点（size: 6/7/8，4 处共用，保留 3 种 size 表视觉层次：侧栏小 6 / dashboard 中 7 / 段 header 大 8）
     /// - help: 可选 hover 提示文字（账号 / 路由 / Codex 状态说明）
     func statusDot(color: Color, size: CGFloat = 6, help: String? = nil) -> some View {
