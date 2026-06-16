@@ -88,29 +88,15 @@ struct CodexInjectionSettingsView: View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
         if isActive, let activatedAt = appLayer.activeInjection?.activatedAt {
             // 激活态：显示激活时间，让用户看到"激活多久了"——比单字"已激活"信息密度高
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                Text("已激活")
+            HStack(spacing: 6) {
+                StatusBadge(icon: "checkmark.circle.fill", text: "已激活", tint: .green)
                 Text("·").foregroundStyle(.secondary)
                 Text(activatedAt, style: .time)
             }
             .font(.caption)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.green.opacity(0.15))
-            )
-            .foregroundStyle(.green)
             .help("激活于 \(activatedAt.formatted(date: .abbreviated, time: .standard))")
         } else {
-            Label("未激活", systemImage: "circle.dashed")
-                .font(.caption)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.gray.opacity(0.15))
-                )
-                .foregroundStyle(.secondary)
+            StatusBadge(icon: "circle.dashed", text: "未激活", tint: .secondary)
         }
     }
 
@@ -281,17 +267,13 @@ struct CodexInjectionSettingsView: View {
     }
 
     private func autoSavedBadge(at date: Date) -> some View {
-        Label("已自动保存 · \(Self.autoSavedTimeFormatter.string(from: date))",
-            systemImage: "checkmark.seal.fill")
-            .font(.caption)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.blue.opacity(0.12))
-            )
-            .foregroundStyle(.blue)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
+        StatusBadge(
+            icon: "checkmark.seal.fill",
+            text: "已自动保存 · \(Self.autoSavedTimeFormatter.string(from: date))",
+            tint: .blue
+        )
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
     }
 }
 // MARK: - 自适应高度 TextEditor

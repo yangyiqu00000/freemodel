@@ -1706,22 +1706,9 @@ private enum AddKind { case account, codex }
             }
         }()
         if let pair {
-            HStack(spacing: 4) {
-                Image(systemName: pair.icon)
-                    .font(.caption2)
-                Text(pair.text)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(pair.color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(pair.color.opacity(0.12))
-            )
-            .frame(height: 22)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: apiKeyStatus)
+            StatusBadge(icon: pair.icon, text: pair.text, tint: pair.color)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: apiKeyStatus)
         }
     }
 
@@ -1730,20 +1717,11 @@ private enum AddKind { case account, codex }
     @ViewBuilder
     private var urlPresetStatusBadge: some View {
         if let status = urlPresetStatus {
-            HStack(spacing: 4) {
-                Image(systemName: status.success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.caption2)
-                Text(status.message)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(status.success ? .green : .red)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule().fill((status.success ? Color.green : Color.red).opacity(0.12))
+            StatusBadge(
+                icon: status.success ? "checkmark.circle.fill" : "xmark.circle.fill",
+                text: status.message,
+                tint: status.success ? .green : .red
             )
-            .frame(height: 22)
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: urlPresetStatus)
         }
