@@ -174,9 +174,9 @@ struct CodexInjectionSettingsView: View {
                         appLayer.captureCurrentCodexState(into: cfg.id)
                     } label: {
                         Label("抓取当前 ~/.codex/auth.json 到这里", systemImage: "square.and.arrow.down")
-                            .font(.caption)
                     }
                     .buttonStyle(.borderless)
+                    .controlSize(.small)
                     .help("在终端跑完 `codex` 完成 ChatGPT 登录后，点此把当前真实状态保存到本条配置。")
                 }
             } else {
