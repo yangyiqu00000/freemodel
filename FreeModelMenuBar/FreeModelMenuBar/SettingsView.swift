@@ -209,7 +209,7 @@ private enum AddKind { case account, codex }
                                     refreshSection
                                 }
                             } else {
-                                emptyState
+                                emptyStateView(.accountGone)
                             }
                         case .logs:
                             logsHeader
@@ -222,7 +222,7 @@ private enum AddKind { case account, codex }
                             )
                         }
                     } else {
-                        emptyState
+                        emptyStateView(.noSelection)
                     }
                 }
                 .padding(24)
@@ -786,17 +786,38 @@ private enum AddKind { case account, codex }
         routerStatusColor(routerManager.status)
     }
 
-    private var emptyState: some View {
+    /// 详情区空态（2 处共用，文案独立）
+    /// - .noSelection：未选中任何项
+    /// - .accountGone：选中账号刚被删（不再误导为"还没有账号"）
+    enum EmptyStateKind {
+        case noSelection
+        case accountGone
+    }
+
+    private func emptyStateView(_ kind: EmptyStateKind) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 36))
-                .foregroundStyle(.orange)
-            Text("还没有账号")
-                .font(.headline)
-            Text("点击侧边栏右上角的 + 添加账号")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            switch kind {
+            case .noSelection:
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.orange)
+                Text("还没有选中账号")
+                    .font(.headline)
+                Text("点击侧边栏右上角的 + 添加账号，或选中现有账号")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            case .accountGone:
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.secondary)
+                Text("该账号已不存在")
+                    .font(.headline)
+                Text("可能刚被删除，刷新或选中其他账号")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 360)
         .padding(24)
