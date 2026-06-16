@@ -98,6 +98,8 @@ private enum AddKind { case account, codex }
     @State private var urlPresetStatusToken: Int = 0
     @State private var renameText: String = ""
     @State private var initialDisplayName: String = ""
+    @State private var initialApiURL: String = ""
+    @State private var initialDashboardURL: String = ""
     @State private var apiURLInput: String = ""
     @State private var dashboardURLInput: String = ""
 
@@ -714,6 +716,8 @@ private enum AddKind { case account, codex }
 	        initialDisplayName = account.displayName
 	        apiURLInput = account.apiBaseURL
 	        dashboardURLInput = account.dashboardURL
+	        initialApiURL = account.apiBaseURL
+	        initialDashboardURL = account.dashboardURL
 	        apiKeyInput = account.apiKey ?? ""
 
 	        let s = account.activeRouterSettings
@@ -1181,23 +1185,39 @@ private enum AddKind { case account, codex }
             .padding(.bottom, 4)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("控制台网页 Base URL")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("控制台网页 Base URL")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if dashboardURLInput.trimmingCharacters(in: .whitespacesAndNewlines) != initialDashboardURL {
+                        Image(systemName: "circle.dashed")
+                            .foregroundStyle(.orange)
+                            .imageScale(.small)
+                    }
+                }
                 TextField("https://freemodel.dev", text: $dashboardURLInput)
                     .textFieldStyle(.roundedBorder)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("API Base URL")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("API Base URL")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if apiURLInput.trimmingCharacters(in: .whitespacesAndNewlines) != initialApiURL {
+                        Image(systemName: "circle.dashed")
+                            .foregroundStyle(.orange)
+                            .imageScale(.small)
+                    }
+                }
                 TextField("https://api.freemodel.dev", text: $apiURLInput)
                     .textFieldStyle(.roundedBorder)
             }
 
             Button("保存服务器地址") {
                 accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
+                initialApiURL = apiURLInput
+                initialDashboardURL = dashboardURLInput
                 triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "服务器地址已保存"))
             }
             .buttonStyle(.bordered)
