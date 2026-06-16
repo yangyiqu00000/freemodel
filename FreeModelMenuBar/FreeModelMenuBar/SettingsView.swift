@@ -109,6 +109,8 @@ private enum AddKind { case account, codex }
 
     // 删除确认
     @State private var pendingDeleteAccount: ProviderAccount? = nil
+    @State private var pendingRenameAccount: ProviderAccount? = nil
+    @State private var renameInput: String = ""
     @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
 
     // 详情区 3 段展开状态（已全部默认展开：3 段是平等逻辑，不再折叠）
@@ -280,6 +282,29 @@ private enum AddKind { case account, codex }
         } message: { _ in
             Text("该账号的 API Key、控制台登录态与本地缓存余额将一并清除。此操作不可撤销。")
         }
+        .alert(
+            "重命名账号",
+            isPresented: Binding(
+                get: { pendingRenameAccount != nil },
+                set: { if !$0 { pendingRenameAccount = nil } }
+            ),
+            presenting: pendingRenameAccount
+        ) { acct in
+            TextField("新名称", text: $renameInput)
+                .textFieldStyle(.roundedBorder)
+            Button("保存") {
+                let trimmed = renameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    accountManager.renameAccount(id: acct.id, displayName: trimmed)
+                }
+                pendingRenameAccount = nil
+            }
+            Button("取消", role: .cancel) {
+                pendingRenameAccount = nil
+            }
+        } message: { acct in
+            Text("当前名称：\(acct.displayName)")
+        }
         .confirmationDialog(
             "确定删除注入配置 “\(pendingDeleteCodexConfig?.label ?? "")” ？",
             isPresented: Binding(
@@ -350,6 +375,28 @@ private enum AddKind { case account, codex }
         accountRow(account)
             .tag(SidebarItem.account(account.id))
             .contextMenu {
+                Button {
+                    renameInput = account.displayName
+                    pendingRenameAccount = account
+                } label: {
+                    Label("重命名", systemImage: "pencil")
+                }
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(account.id.uuidString, forType: .string)
+                } label: {
+                    Label("复制账号 ID", systemImage: "doc.on.doc")
+                }
+                if account.id != accountManager.activeAccountID {
+                    Divider()
+                    Button {
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
+                    } label: {
+                        Label("设为活跃账号", systemImage: "checkmark.circle")
+                    }
+                }
+                Divider()
                 Button(role: .destructive) {
                     pendingDeleteAccount = account
                 } label: {
