@@ -126,6 +126,15 @@ private enum AddKind { case account, codex }
     @State private var baseURLCopiedToastToken: Int = 0
 
     // Router State
+    @State private var initialRouterEnabled: Bool = false
+    @State private var initialRouterPort: String = "38440"
+    @State private var initialRouterUpstreamURL: String = ""
+    @State private var initialRouterRouteModel: String = ""
+    @State private var initialRouterDefaultModel: String = ""
+    @State private var initialRouterStreaming: Bool = true
+    @State private var initialRouterFailoverEnabled: Bool = true
+    @State private var initialRouterMaxConcurrency: String = "0"
+    @State private var initialRouterMinIntervalMs: String = "0"
     @State private var routerEnabled: Bool = false
     @State private var routerPort: String = "38440"
     @State private var routerUpstreamURL: String = ""
@@ -684,14 +693,23 @@ private enum AddKind { case account, codex }
 
 	        let s = account.activeRouterSettings
         routerEnabled = s.enabled
+        initialRouterEnabled = s.enabled
         routerPort = String(s.port)
+        initialRouterPort = String(s.port)
         routerUpstreamURL = s.upstreamBaseURL
+        initialRouterUpstreamURL = s.upstreamBaseURL
         routerRouteModel = s.routeModel
+        initialRouterRouteModel = s.routeModel
         routerDefaultModel = s.defaultModel
+        initialRouterDefaultModel = s.defaultModel
         routerStreaming = s.supportsStreaming
+        initialRouterStreaming = s.supportsStreaming
         routerFailoverEnabled = s.isFailoverEnabled
+        initialRouterFailoverEnabled = s.isFailoverEnabled
         routerMaxConcurrency = String(s.maxConcurrency ?? 0)
+        initialRouterMaxConcurrency = String(s.maxConcurrency ?? 0)
         routerMinIntervalMs = String(s.minIntervalMs ?? 0)
+        initialRouterMinIntervalMs = String(s.minIntervalMs ?? 0)
 
         // 切到不同账号时，重置 API Key / URL 预设状态（避免上一个账号的提示泄漏）
         apiKeyStatus = .unsaved
@@ -1315,6 +1333,14 @@ private enum AddKind { case account, codex }
             HStack {
                 Label("本地 Responses 路由代理", systemImage: "arrow.triangle.2.circlepath.circle")
                     .font(.headline)
+                if routerHasUnsavedChanges() {
+                    Image(systemName: "circle.dashed")
+                        .foregroundStyle(.orange)
+                        .imageScale(.small)
+                    Text("未保存")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
                 Spacer()
                 HStack(spacing: 6) {
                     Text(routerStatusSubtitle)
@@ -1337,8 +1363,8 @@ private enum AddKind { case account, codex }
                 Toggle(isOn: Binding(
                     get: { routerEnabled },
                     set: { newValue in
+                        // 仅改本地 @State，由底部「保存及重载配置」统一落盘（与 routerStreaming / routerFailoverEnabled 行为一致）
                         routerEnabled = newValue
-                        saveRouterSettings()
                     }
                 )) {
                     Text(toggleLabel(routerEnabled: routerEnabled, hasAPIKey: account.hasAPIKey))
@@ -1487,13 +1513,23 @@ private enum AddKind { case account, codex }
                     }
                     HStack {
                         Spacer()
-                        Button("保存及重载配置") {
+                        Button(routerHasUnsavedChanges() ? "保存及重载配置" : "已保存") {
                             saveRouterSettings()
+                            // 同步 initial，header 未保存态消失
+                            initialRouterEnabled = routerEnabled
+                            initialRouterPort = routerPort
+                            initialRouterUpstreamURL = routerUpstreamURL
+                            initialRouterRouteModel = routerRouteModel
+                            initialRouterDefaultModel = routerDefaultModel
+                            initialRouterStreaming = routerStreaming
+                            initialRouterFailoverEnabled = routerFailoverEnabled
+                            initialRouterMaxConcurrency = routerMaxConcurrency
+                            initialRouterMinIntervalMs = routerMinIntervalMs
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.regular)
                         .frame(height: 28)
-                        .disabled(!routerIsValid())
+                        .disabled(!routerIsValid() || !routerHasUnsavedChanges())
                     }
                     .padding(.top, 4)
                 }
@@ -1515,6 +1551,19 @@ private enum AddKind { case account, codex }
             && !routerFieldEmpty(routerUpstreamURL)
             && !routerFieldEmpty(routerRouteModel)
             && !routerFieldEmpty(routerDefaultModel)
+    }
+
+    /// 8 字段任一与 initial 不一致即视为有未保存变更（与 URL 段未保存态模式一致）
+    private func routerHasUnsavedChanges() -> Bool {
+        routerEnabled != initialRouterEnabled
+            || routerPort.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterPort.trimmingCharacters(in: .whitespacesAndNewlines)
+            || routerUpstreamURL.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterUpstreamURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            || routerRouteModel.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterRouteModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            || routerDefaultModel.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterDefaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            || routerStreaming != initialRouterStreaming
+            || routerFailoverEnabled != initialRouterFailoverEnabled
+            || routerMaxConcurrency != initialRouterMaxConcurrency
+            || routerMinIntervalMs != initialRouterMinIntervalMs
     }
 
     // MARK: - Global Logs Console Views & Actions
