@@ -749,27 +749,13 @@ private enum AddKind { case account, codex }
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "gearshape.fill")
-                .font(.title2)
-                .foregroundStyle(.blue)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("FreeModel 设置")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                HStack(spacing: 6) {
-                    Text(headerSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let dot = headerStatusDot {
-                        Circle()
-                            .fill(dot)
-                            .frame(width: 6, height: 6)
-                    }
-                }
-            }
-            Spacer()
-        }
+        navHeader(
+            icon: "gearshape.fill",
+            tint: .blue,
+            title: "FreeModel 设置",
+            subtitle: headerSubtitle,
+            dotColor: headerStatusDot
+        )
     }
 
     private var headerSubtitle: String {
@@ -1599,25 +1585,13 @@ private enum AddKind { case account, codex }
     private var logsHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "terminal.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("路由代理运行日志")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    HStack(spacing: 6) {
-                        Text(routerStatusSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if let dot = headerStatusDot {
-                            Circle()
-                                .fill(dot)
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                }
-                Spacer()
+                navHeader(
+                    icon: "terminal.fill",
+                    tint: .green,
+                    title: "路由代理运行日志",
+                    subtitle: routerStatusSubtitle,
+                    dotColor: headerStatusDot
+                )
                 if let activeAccount = accountManager.activeAccount {
                     let isRunning = routerManager.status == .running
                     let portVal = activeAccount.activeRouterSettings.port
@@ -1834,6 +1808,30 @@ private enum AddKind { case account, codex }
     }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    /// 详情区顶部 nav header（icon + title2 bold 标题 + caption 副标题 + 可选 dot），2 处共用
+    private func navHeader(icon: String, tint: Color, title: String, subtitle: String, dotColor: Color? = nil) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                HStack(spacing: 6) {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let color = dotColor {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            }
+        }
+    }
 
     private func sectionHeader(_ title: String, systemImage: String, statusColor: Color? = nil) -> some View {
         HStack(spacing: 6) {
