@@ -431,7 +431,7 @@ struct MenuContent: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString("http://127.0.0.1:\(settings.port)/v1", forType: .string)
                     }) {
-                        Image(systemName: "doc.on.doc")
+                        Image(systemName: "doc.on.doc.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }

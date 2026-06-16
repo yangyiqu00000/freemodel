@@ -385,7 +385,7 @@ private enum AddKind { case account, codex }
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(account.id.uuidString, forType: .string)
                 } label: {
-                    Label("复制账号 ID", systemImage: "doc.on.doc")
+                    Label("复制账号 ID", systemImage: "doc.on.doc.fill")
                 }
                 if account.id != accountManager.activeAccountID {
                     Divider()
@@ -1526,7 +1526,7 @@ private enum AddKind { case account, codex }
                         let portVal = activeAccount.activeRouterSettings.port
                         NSPasteboard.general.setString("http://127.0.0.1:\(portVal)/v1", forType: .string)
                     }) {
-                        Label("复制 Base URL", systemImage: "doc.on.doc")
+                        Label("复制 Base URL", systemImage: "doc.on.doc.fill")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
