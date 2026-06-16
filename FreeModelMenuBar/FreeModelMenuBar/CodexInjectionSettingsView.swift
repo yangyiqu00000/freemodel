@@ -247,11 +247,12 @@ struct CodexInjectionSettingsView: View {
                 pendingDeleteCodexConfig = cfg
             } label: {
                 Label("删除", systemImage: "trash.fill")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
             .tint(.red)
-            .frame(width: 100)
+            .frame(minWidth: 80, maxWidth: .infinity)
             .help("删除本条注入配置（清空编辑中的 auth.json + config.toml）")
         }
     }
