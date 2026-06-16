@@ -1210,6 +1210,11 @@ private enum AddKind { case account, codex }
 
     // MARK: - 统一 provider 预设入口（1 次点击设齐 6 个字段）
 
+    private func isPresetActive(_ preset: ProviderPreset, for account: ProviderAccount) -> Bool {
+        // 4 个 preset 的 apiURL 互不相同，仅用 apiBaseURL 一字段就能完整区分
+        return account.apiBaseURL == preset.config.apiURL
+    }
+
     private func applyProviderPreset(_ preset: ProviderPreset, for account: ProviderAccount) {
         let cfg = preset.config
         // 写账号层
@@ -1399,11 +1404,21 @@ private enum AddKind { case account, codex }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(ProviderPreset.allCases) { preset in
-                    Button(preset.rawValue) {
-                        applyProviderPreset(preset, for: account)
+                    if isPresetActive(preset, for: account) {
+                        Button(preset.rawValue) {
+                            applyProviderPreset(preset, for: account)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .help("当前账号正在使用此预设")
+                    } else {
+                        Button(preset.rawValue) {
+                            applyProviderPreset(preset, for: account)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .help("1 次点击套用 \(preset.rawValue) 的 URL+查询模式+路由+默认模型+Streaming+Failover")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
             }
             .padding(.bottom, 4)
