@@ -1439,22 +1439,49 @@ private enum AddKind { case account, codex }
                     }
                     // 3 个重复 provider 按钮已删除（统一到 Toggle 下方 1 套 chip）
                     
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 2) {
-                                Text("本地代理端口")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                if routerFieldEmpty(routerPort) {
-                                    Text("*").font(.caption2).foregroundStyle(.red)
+                    // 4 个输入字段按语义拆 2 组：代理设置（端口+上游URL） / 模型映射（对外+映射）
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("代理设置", systemImage: "network")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 2) {
+                                    Text("本地代理端口")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    if routerFieldEmpty(routerPort) {
+                                        Text("*").font(.caption2).foregroundStyle(.red)
+                                    }
                                 }
+                                TextField("38440", text: $routerPort)
+                                    .textFieldStyle(.roundedBorder)
+                                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerPort) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
+                                    .frame(width: 80)
                             }
-                            TextField("38440", text: $routerPort)
-                                .textFieldStyle(.roundedBorder)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerPort) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                                .frame(width: 80)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 2) {
+                                    Text("上游 API Base URL")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    if routerFieldEmpty(routerUpstreamURL) {
+                                        Text("*").font(.caption2).foregroundStyle(.red)
+                                    }
+                                }
+                                TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
+                                    .textFieldStyle(.roundedBorder)
+                                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerUpstreamURL) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
+                            }
                         }
-                        
+                    }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("模型映射", systemImage: "arrow.left.arrow.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 2) {
                                 Text("对外暴露模型名")
@@ -1468,35 +1495,22 @@ private enum AddKind { case account, codex }
                                 .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerRouteModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
                         }
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 2) {
-                            Text("上游 API Base URL")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            if routerFieldEmpty(routerUpstreamURL) {
-                                Text("*").font(.caption2).foregroundStyle(.red)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 2) {
+                                Text("映射到上游模型名")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                if routerFieldEmpty(routerDefaultModel) {
+                                    Text("*").font(.caption2).foregroundStyle(.red)
+                                }
                             }
-                        }
-                        TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
-                            .textFieldStyle(.roundedBorder)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerUpstreamURL) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 2) {
-                            Text("映射到上游模型名")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            if routerFieldEmpty(routerDefaultModel) {
-                                Text("*").font(.caption2).foregroundStyle(.red)
-                            }
-                        }
-                        TextField("deepseek-chat", text: $routerDefaultModel)
-                            .textFieldStyle(.roundedBorder)
+                            TextField("deepseek-chat", text: $routerDefaultModel)
+                                .textFieldStyle(.roundedBorder)
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerDefaultModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
+                        }
                     }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
 
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
