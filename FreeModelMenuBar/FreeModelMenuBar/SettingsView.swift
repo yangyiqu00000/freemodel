@@ -1194,6 +1194,9 @@ private enum AddKind { case account, codex }
                         Image(systemName: "circle.dashed")
                             .foregroundStyle(.orange)
                             .imageScale(.small)
+                        Text("未保存")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
                     }
                 }
                 TextField("https://freemodel.dev", text: $dashboardURLInput)
@@ -1209,6 +1212,9 @@ private enum AddKind { case account, codex }
                         Image(systemName: "circle.dashed")
                             .foregroundStyle(.orange)
                             .imageScale(.small)
+                        Text("未保存")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
                     }
                 }
                 TextField("https://api.freemodel.dev", text: $apiURLInput)
