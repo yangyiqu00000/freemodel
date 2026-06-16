@@ -96,6 +96,7 @@ private enum AddKind { case account, codex }
     }
     @State private var urlPresetStatus: UrlPresetStatus? = nil
     @State private var renameText: String = ""
+    @State private var initialDisplayName: String = ""
     @State private var apiURLInput: String = ""
     @State private var dashboardURLInput: String = ""
 
@@ -706,6 +707,7 @@ private enum AddKind { case account, codex }
 
 	        selectedRefreshInterval = account.refreshInterval
 	        renameText = account.displayName
+	        initialDisplayName = account.displayName
 	        apiURLInput = account.apiBaseURL
 	        dashboardURLInput = account.dashboardURL
 	        apiKeyInput = account.apiKey ?? ""
@@ -816,13 +818,26 @@ private enum AddKind { case account, codex }
                         let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
                         accountManager.renameAccount(id: account.id, displayName: trimmed)
+                        initialDisplayName = trimmed
                     }
                 Button("重命名") {
                     let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
                     accountManager.renameAccount(id: account.id, displayName: trimmed)
+                    initialDisplayName = trimmed
                 }
                 .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if renameText.trimmingCharacters(in: .whitespacesAndNewlines) != initialDisplayName
+                    && !renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.dashed")
+                            .foregroundStyle(.orange)
+                        Text("未保存")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                    .help("尚未保存，点「重命名」或按回车提交")
+                }
             }
 	            HStack(spacing: 8) {
 	                let platformName = providerName(account)
