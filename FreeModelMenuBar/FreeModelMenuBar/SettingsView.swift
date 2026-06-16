@@ -665,7 +665,7 @@ private enum AddKind { case account, codex }
 
         //  优先级：选中 (accent 0.18) > hover (secondary 0.10) > 透明
         private var backgroundFill: Color {
-            if isSelected { return Color.accentColor.opacity(0.18) }
+            if isSelected { return Color.accentFill }
             if isHovered  { return Color.secondary.opacity(0.10) }
             return Color.clear
         }
@@ -1237,7 +1237,7 @@ private enum AddKind { case account, codex }
             .font(.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-	            .background(Capsule().fill(Color.gray.opacity(0.12)))
+	            .background(Capsule().fill(Color.overlayFill))
 	    }
 
 	    private func providerName(_ account: ProviderAccount) -> String {
@@ -1900,7 +1900,7 @@ private extension View {
         self
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.1)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
     }
 
     /// 侧边栏内联添加行背景（blue 6pt 圆角小卡片）——2 处统一使用（账号 + Codex 注入）

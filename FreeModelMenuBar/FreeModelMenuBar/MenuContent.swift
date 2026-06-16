@@ -178,7 +178,7 @@ struct MenuContent: View {
                     .contentShape(Rectangle())
                     .background(
                         RoundedRectangle(cornerRadius: 5)
-                            .fill(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
+                            .fill(isActive ? Color.accentFill : Color.clear)
                     )
                 }
                 .buttonStyle(.plain)
