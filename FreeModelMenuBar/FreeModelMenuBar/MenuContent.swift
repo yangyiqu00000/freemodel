@@ -194,10 +194,10 @@ struct MenuContent: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.orange)
 
-            Text("还没有账号")
+            Text("还没有任何账号")
                 .font(.headline)
 
-            Text("点击侧边栏右上角的 + 添加账号")
+            Text("点击「设置」添加账号")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
