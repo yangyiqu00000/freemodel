@@ -485,37 +485,25 @@ private enum AddKind { case account, codex }
                     GridItem(.flexible(), spacing: 6)
                 ], spacing: 6) {
                     Button {
-                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "freemodel")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                        addExpanded = nil
+                        commitAccountCreation(providerID: "freemodel")
                     } label: {
                         Label("FreeModel 网页", systemImage: "globe")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "deepseek")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                        addExpanded = nil
+                        commitAccountCreation(providerID: "deepseek")
                     } label: {
                         Label("DeepSeek API", systemImage: "key.fill")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "openrouter")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                        addExpanded = nil
+                        commitAccountCreation(providerID: "openrouter")
                     } label: {
                         Label("OpenRouter API", systemImage: "arrow.triangle.branch")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
-                        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: "modelscope")
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
-                        addExpanded = nil
+                        commitAccountCreation(providerID: "modelscope")
                     } label: {
                         Label("ModelScope API", systemImage: "cube")
                             .frame(maxWidth: .infinity)
@@ -1892,6 +1880,15 @@ private enum AddKind { case account, codex }
     private func routerHeaderStatusColor() -> Color? {
         // 路由段：复用 routerStatusColor
         return routerStatusColor(routerManager.status)
+    }
+
+    // MARK: - 创建账号并选为活跃（4 个 provider chip 共用，1 行调用）
+
+    private func commitAccountCreation(providerID: String) {
+        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: providerID)
+        accountManager.selectAccount(id: account.id)
+        balanceManager.syncFromActiveAccount()
+        addExpanded = nil
     }
 
     // MARK: - 重命名账号提交（trim + 非空 + renameAccount 同一来源，3 处共用）
