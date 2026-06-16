@@ -1242,6 +1242,27 @@ private enum AddKind { case account, codex }
         triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设"))
     }
 
+    /// 路由段 provider 预设 chip（active = .borderedProminent 蓝底；inactive = .bordered 描边），4 个 preset 共用
+    @ViewBuilder
+    private func providerPresetChip(preset: ProviderPreset, account: ProviderAccount) -> some View {
+        let isActive = isPresetActive(preset, for: account)
+        if isActive {
+            Button(preset.rawValue) {
+                applyProviderPreset(preset, for: account)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("当前账号正在使用此预设")
+        } else {
+            Button(preset.rawValue) {
+                applyProviderPreset(preset, for: account)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("1 次点击套用 \(preset.rawValue) 的 URL+查询模式+路由+默认模型+Streaming+Failover")
+        }
+    }
+
     private func toggleLabel(routerEnabled: Bool, hasAPIKey: Bool) -> String {
         if !hasAPIKey { return "请先配置 API Key" }
         return routerEnabled ? "正在运行代理" : "启用本地路由代理"
@@ -1389,21 +1410,7 @@ private enum AddKind { case account, codex }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(ProviderPreset.allCases) { preset in
-                    if isPresetActive(preset, for: account) {
-                        Button(preset.rawValue) {
-                            applyProviderPreset(preset, for: account)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .help("当前账号正在使用此预设")
-                    } else {
-                        Button(preset.rawValue) {
-                            applyProviderPreset(preset, for: account)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .help("1 次点击套用 \(preset.rawValue) 的 URL+查询模式+路由+默认模型+Streaming+Failover")
-                    }
+                    providerPresetChip(preset: preset, account: account)
                 }
             }
             .padding(.bottom, 4)
