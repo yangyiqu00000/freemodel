@@ -876,11 +876,15 @@ private enum AddKind { case account, codex }
                     )
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .frame(height: 28)
 
                 Button("刷新余额") {
                     Task { await balanceManager.fetchBalance() }
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .disabled(balanceManager.isLoading)
 
                 Button(role: .destructive) {
@@ -891,6 +895,8 @@ private enum AddKind { case account, codex }
                     Text("清除登录态")
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .frame(height: 28)
                 .tint(.red)
             }
 
