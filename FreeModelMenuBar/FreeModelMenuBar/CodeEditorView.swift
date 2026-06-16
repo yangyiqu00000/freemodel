@@ -301,8 +301,8 @@ struct CodeEditorView: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.isGrammarCheckingEnabled = false
+        textView.isHorizontallyResizable = true
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.backgroundColor = CodeEditorPalette.editorBackground
@@ -312,7 +312,23 @@ struct CodeEditorView: NSViewRepresentable {
         textView.insertionPointColor = .white
         textView.delegate = context.coordinator
 
+        // 让 layoutManager 用无穷高容器（关键：NSTextView 高度自适配需要这个）
+        textView.textContainer?.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: .greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = true
+
         scrollView.documentView = textView
+
+        // 内容变化 / 窗口 resize 时重算 NSTextView frame
+        NotificationCenter.default.addObserver(
+            forName: NSText.didChangeNotification,
+            object: textView,
+            queue: .main
+        ) { [weak textView] _ in
+            textView?.invalidateIntrinsicContentSize()
+        }
 
         // 行号 ruler
         let ruler = CodeLineNumberRulerView(scrollView: scrollView)
@@ -327,10 +343,13 @@ struct CodeEditorView: NSViewRepresentable {
         context.coordinator.scrollView = scrollView
         context.coordinator.language = language
 
-        // 高度限制
+        // 高度自适应：textView 高度 = layoutManager.usedRect + 上下 inset；
+        // 重设 frame 让 scrollView 知道 contentSize
+        let contentHeight = textView.layoutManager?.usedRect(for: textView.textContainer!).size.height ?? 0
+        let totalHeight = max(minHeight, min(maxHeight, contentHeight + textView.textContainerInset.height * 2))
         textView.minSize = NSSize(width: 0, height: minHeight)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: maxHeight)
+        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: totalHeight)
 
         return scrollView
     }
@@ -344,6 +363,20 @@ struct CodeEditorView: NSViewRepresentable {
             let selected = textView.selectedRange
             textView.textStorage?.setAttributedString(CodeHighlighter.highlight(text, language: language))
             textView.selectedRange = NSRange(location: min(selected.location, text.count), length: 0)
+        }
+
+        // 重算高度（外部 binding 改时也要触发）
+        if let layoutManager = textView.layoutManager, let container = textView.textContainer {
+            layoutManager.ensureLayout(for: container)
+            let contentHeight = layoutManager.usedRect(for: container).size.height
+            let totalHeight = max(minHeight, min(maxHeight, contentHeight + textView.textContainerInset.height * 2))
+            if abs(textView.frame.height - totalHeight) > 1 {
+                textView.frame = NSRect(
+                    x: 0, y: 0,
+                    width: max(textView.frame.width, nsView.contentSize.width),
+                    height: totalHeight
+                )
+            }
         }
     }
 
