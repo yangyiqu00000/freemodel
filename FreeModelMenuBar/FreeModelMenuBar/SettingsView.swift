@@ -823,12 +823,15 @@ private enum AddKind { case account, codex }
                 .buttonStyle(.bordered)
                 .disabled(balanceManager.isLoading)
 
-                Button("清除登录态") {
+                Button(role: .destructive) {
                     accountManager.clearCookies(for: account.id)
                     accountManager.clearBalance(for: account.id)
                     balanceManager.syncFromActiveAccount()
+                } label: {
+                    Text("清除登录态")
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
             }
 
             if let balance = account.lastBalance {
@@ -933,13 +936,16 @@ private enum AddKind { case account, codex }
                 .frame(height: 28)
                 .disabled(apiKeyInput.isEmpty || isTesting)
 
-                Button("清除 API Key") {
+                Button(role: .destructive) {
                     balanceManager.apiKey = nil
                     apiKeyInput = ""
                     apiKeyStatus = .empty
+                } label: {
+                    Text("清除 API Key")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+                .tint(.red)
                 .frame(height: 28)
             }
 
