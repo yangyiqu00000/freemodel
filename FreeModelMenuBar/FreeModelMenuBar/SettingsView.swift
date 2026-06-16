@@ -168,7 +168,7 @@ private enum AddKind { case account, codex }
                                     linksSection(account)
                                 }
 
-                                Divider().padding(.vertical, 4)
+                                sectionDivider()
 
                                 sectionHeader("连接", systemImage: "link", statusColor: connectionHeaderStatusColor(account))
                                 sectionVStack {
@@ -176,7 +176,7 @@ private enum AddKind { case account, codex }
                                     apiKeySection(account)
                                 }
 
-                                Divider().padding(.vertical, 4)
+                                sectionDivider()
 
                                 sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerHeaderStatusColor())
                                 sectionVStack {
@@ -1983,6 +1983,11 @@ private extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
+    }
+
+    /// 详情区/菜单栏分段 Divider（4pt 垂直 padding），6 处共用
+    func sectionDivider() -> some View {
+        Divider().padding(.vertical, 4)
     }
 
     /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
