@@ -123,6 +123,9 @@ private enum AddKind { case account, codex }
     @State private var logsClearedToast: String? = nil
     @State private var pendingScrollToAPIKey: Bool = false
     @State private var logsClearedToastToken: Int = 0
+    // 复制 Base URL toast
+    @State private var baseURLCopiedToast: String? = nil
+    @State private var baseURLCopiedToastToken: Int = 0
 
     // Router State
     @State private var routerEnabled: Bool = false
@@ -1611,17 +1614,23 @@ private enum AddKind { case account, codex }
                 Spacer()
                 if let activeAccount = accountManager.activeAccount {
                     let isRunning = routerManager.status == .running
+                    let portVal = activeAccount.activeRouterSettings.port
+                    let urlString = "http://127.0.0.1:\(portVal)/v1"
                     Button(action: {
                         NSPasteboard.general.clearContents()
-                        let portVal = activeAccount.activeRouterSettings.port
-                        NSPasteboard.general.setString("http://127.0.0.1:\(portVal)/v1", forType: .string)
+                        NSPasteboard.general.setString(urlString, forType: .string)
+                        triggerBaseURLCopiedToast()
                     }) {
                         Label("复制 Base URL", systemImage: "doc.on.doc.fill")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(!isRunning)
-                    .help(isRunning ? "复制 http://127.0.0.1:\(activeAccount.activeRouterSettings.port)/v1 到剪贴板" : "启动路由代理后才可复制 Base URL")
+                    .help(isRunning ? "复制 \(urlString) 到剪贴板" : "启动路由代理后才可复制 Base URL")
+                    if let toast = baseURLCopiedToast {
+                        StatusBadge(icon: "doc.on.doc.fill", text: toast, tint: .blue)
+                            .transition(.opacity)
+                    }
                 }
             }
 
@@ -1765,6 +1774,19 @@ private enum AddKind { case account, codex }
                 if logsClearedToastToken == token {
                     withAnimation { logsClearedToast = nil }
                 }
+            }
+        }
+    }
+
+    private func triggerBaseURLCopiedToast() {
+        baseURLCopiedToast = "Base URL 已复制"
+        // 3 秒后自动隐藏
+        baseURLCopiedToastToken &+= 1
+        let token = baseURLCopiedToastToken
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if baseURLCopiedToastToken == token {
+                withAnimation { baseURLCopiedToast = nil }
             }
         }
     }
