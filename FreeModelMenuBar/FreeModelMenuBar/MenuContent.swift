@@ -137,22 +137,25 @@ struct MenuContent: View {
     // MARK: - 子视图
 
     private var accountSwitcher: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             Text("账号")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
 
             ForEach(accountManager.accounts) { account in
+                let isActive = (account.id == accountManager.activeAccountID)
                 Button {
                     accountManager.selectAccount(id: account.id)
                     balanceManager.syncFromActiveAccount()
                 } label: {
                     HStack {
-                        Image(systemName: account.id == accountManager.activeAccountID ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(account.id == accountManager.activeAccountID ? .blue : .secondary)
+                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isActive ? .blue : .secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.displayName)
                                 .lineLimit(1)
+                                .fontWeight(isActive ? .semibold : .regular)
                             switch account.queryMode {
                             case .dashboard:
                                 Text(account.hasDashboardSession ? "已保存控制台登录态" : "未登录控制台")
@@ -171,6 +174,13 @@ struct MenuContent: View {
                                 .foregroundStyle(balance.isLow ? .orange : .green)
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
+                    )
                 }
                 .buttonStyle(.plain)
             }
