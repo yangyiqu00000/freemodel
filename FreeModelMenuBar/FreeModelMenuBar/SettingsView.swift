@@ -1430,34 +1430,19 @@ private enum AddKind { case account, codex }
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 2) {
-                                    Text("本地代理端口")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    if routerFieldEmpty(routerPort) {
-                                        requiredFieldStar()
-                                    }
-                                }
-                                TextField("38440", text: $routerPort)
-                                    .textFieldStyle(.roundedBorder)
-                                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerPort) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                                    .frame(width: 80)
-                            }
+                            requiredRouterField(
+                                label: "本地代理端口",
+                                placeholder: "38440",
+                                text: $routerPort,
+                                fieldWidth: 80
+                            )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 2) {
-                                    Text("上游 API Base URL")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    if routerFieldEmpty(routerUpstreamURL) {
-                                        requiredFieldStar()
-                                    }
-                                }
-                                TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
-                                    .textFieldStyle(.roundedBorder)
-                                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerUpstreamURL) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                            }
+                            requiredRouterField(
+                                label: "上游 API Base URL",
+                                placeholder: "https://api.deepseek.com/v1",
+                                text: $routerUpstreamURL,
+                                fieldWidth: nil
+                            )
                         }
                     }
                     .padding(8)
@@ -1467,32 +1452,18 @@ private enum AddKind { case account, codex }
                         Label("模型映射", systemImage: "arrow.left.arrow.right")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 2) {
-                                Text("对外暴露模型名")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                if routerFieldEmpty(routerRouteModel) {
-                                    requiredFieldStar()
-                                }
-                            }
-                            TextField("codex-mini", text: $routerRouteModel)
-                                .textFieldStyle(.roundedBorder)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerRouteModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 2) {
-                                Text("映射到上游模型名")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                if routerFieldEmpty(routerDefaultModel) {
-                                    requiredFieldStar()
-                                }
-                            }
-                            TextField("deepseek-chat", text: $routerDefaultModel)
-                                .textFieldStyle(.roundedBorder)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(routerDefaultModel) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-                        }
+                        requiredRouterField(
+                            label: "对外暴露模型名",
+                            placeholder: "codex-mini",
+                            text: $routerRouteModel,
+                            fieldWidth: nil
+                        )
+                        requiredRouterField(
+                            label: "映射到上游模型名",
+                            placeholder: "deepseek-chat",
+                            text: $routerDefaultModel,
+                            fieldWidth: nil
+                        )
                     }
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
@@ -1779,6 +1750,29 @@ private enum AddKind { case account, codex }
     }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    /// 路由段必填字段（label caption2 + 红色星号 + TextField + 必空红描边），4 个 router 字段共用
+    @ViewBuilder
+    private func requiredRouterField(label: String, placeholder: String, text: Binding<String>, fieldWidth: CGFloat?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 2) {
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if routerFieldEmpty(text.wrappedValue) {
+                    requiredFieldStar()
+                }
+            }
+            let textField = TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(text.wrappedValue) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
+            if let fieldWidth = fieldWidth {
+                textField.frame(width: fieldWidth)
+            } else {
+                textField
+            }
+        }
+    }
 
     /// 路由段必填字段红色星号 *（4 个 router 字段共用，0 risk）
     private func requiredFieldStar() -> some View {
