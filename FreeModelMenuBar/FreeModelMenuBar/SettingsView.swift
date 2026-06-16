@@ -357,7 +357,7 @@ private enum AddKind { case account, codex }
     }
 
     private var logsSection: some View {
-        Section(header: Text("运行日志")) {
+        Section(header: sidebarSectionHeader(title: "运行日志", systemImage: "terminal.fill", trailing: nil)) {
             SidebarRow(
                 icon: "terminal.fill",
                 iconColor: routerStatusColor(routerManager.status) ?? .secondary,
@@ -454,21 +454,22 @@ private enum AddKind { case account, codex }
     // MARK: - 账号 section 标题（与 Codex 注入同形状：label + 右侧 +）
 
     private var accountsSectionHeader: some View {
-        HStack {
-            Label("账号", systemImage: "person.2.fill")
-                .font(.headline)
-            Spacer()
-            Button {
-                addExpanded = (addExpanded == .account) ? nil : .account
-                if addExpanded == .account {
-                    newAccountLabel = "新账号 \(Self.shortNow())"
+        sidebarSectionHeader(
+            title: "账号",
+            systemImage: "person.2.fill",
+            trailing: AnyView(
+                Button {
+                    addExpanded = (addExpanded == .account) ? nil : .account
+                    if addExpanded == .account {
+                        newAccountLabel = "新账号 \(Self.shortNow())"
+                    }
+                } label: {
+                    Image(systemName: addExpanded == .account ? "minus" : "plus")
                 }
-            } label: {
-                Image(systemName: addExpanded == .account ? "minus" : "plus")
-            }
-            .buttonStyle(.borderless)
-            .help(addExpanded == .account ? "收起添加账号行" : "新增账号")
-        }
+                .buttonStyle(.borderless)
+                .help(addExpanded == .account ? "收起添加账号行" : "新增账号")
+            )
+        )
     }
     // MARK: - 内联账号添加行（与 codexInlineAddRow 同形状）
 
@@ -536,22 +537,23 @@ private enum AddKind { case account, codex }
     }
 
     private var codexSectionHeader: some View {
-        HStack {
-            Label("Codex 注入", systemImage: "key.horizontal.fill")
-                .font(.headline)
-            Spacer()
-            Button {
-                addExpanded = (addExpanded == .codex) ? nil : .codex
-                if addExpanded == .codex {
-                    newCodexLabel = "新配置 \(Self.shortNow())"
-                    newCodexProvider = "custom-\(Self.shortNow())"
+        sidebarSectionHeader(
+            title: "Codex 注入",
+            systemImage: "key.horizontal.fill",
+            trailing: AnyView(
+                Button {
+                    addExpanded = (addExpanded == .codex) ? nil : .codex
+                    if addExpanded == .codex {
+                        newCodexLabel = "新配置 \(Self.shortNow())"
+                        newCodexProvider = "custom-\(Self.shortNow())"
+                    }
+                } label: {
+                    Image(systemName: addExpanded == .codex ? "minus" : "plus")
                 }
-            } label: {
-                Image(systemName: addExpanded == .codex ? "minus" : "plus")
-            }
-            .buttonStyle(.borderless)
-            .help(addExpanded == .codex ? "收起添加注入配置行" : "添加一条新的注入配置")
-        }
+                .buttonStyle(.borderless)
+                .help(addExpanded == .codex ? "收起添加注入配置行" : "添加一条新的注入配置")
+            )
+        )
     }
     // MARK: - 内联添加行（替代 sheet）
 
@@ -1808,6 +1810,18 @@ private enum AddKind { case account, codex }
     }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    /// 侧边栏 section header（Label + headline + trailing 可选 + button），3 处共用
+    private func sidebarSectionHeader(title: String, systemImage: String, trailing: AnyView?) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            Spacer()
+            if let trailing = trailing {
+                trailing
+            }
+        }
+    }
 
     /// 详情区顶部 nav header（icon + title2 bold 标题 + caption 副标题 + 可选 dot），2 处共用
     private func navHeader(icon: String, tint: Color, title: String, subtitle: String, dotColor: Color? = nil) -> some View {
