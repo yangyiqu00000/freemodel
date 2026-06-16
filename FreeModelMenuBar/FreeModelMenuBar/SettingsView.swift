@@ -249,8 +249,7 @@ private enum AddKind { case account, codex }
                     if let newItem = newItem {
                         selectedItem = newItem
                         if case .account(let uuid) = newItem {
-                            accountManager.selectAccount(id: uuid)
-                            balanceManager.syncFromActiveAccount()
+                            selectAccountAndSync(id: uuid)
                         }
                     }
                 }
@@ -397,8 +396,7 @@ private enum AddKind { case account, codex }
                 if account.id != accountManager.activeAccountID {
                     Divider()
                     Button {
-                        accountManager.selectAccount(id: account.id)
-                        balanceManager.syncFromActiveAccount()
+                        selectAccountAndSync(id: account.id)
                     } label: {
                         Label("设为活跃账号", systemImage: "checkmark.circle.fill")
                     }
@@ -1900,12 +1898,18 @@ private enum AddKind { case account, codex }
         }
     }
 
+    // MARK: - 切换活跃账号并同步余额（selectAccount + syncFromActiveAccount 同一来源，3 处共用）
+
+    private func selectAccountAndSync(id: UUID) {
+        accountManager.selectAccount(id: id)
+        balanceManager.syncFromActiveAccount()
+    }
+
     // MARK: - 创建账号并选为活跃（4 个 provider chip 共用，1 行调用）
 
     private func commitAccountCreation(providerID: String) {
         let account = accountManager.createAccount(displayName: newAccountLabel, providerID: providerID)
-        accountManager.selectAccount(id: account.id)
-        balanceManager.syncFromActiveAccount()
+        selectAccountAndSync(id: account.id)
         addExpanded = nil
     }
 
