@@ -1273,30 +1273,6 @@ private enum AddKind { case account, codex }
         triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设"))
     }
 
-    private func applyRouterPreset(for accountID: UUID, upstreamURL: String, defaultModel: String) {
-        let existing = accountManager.account(id: accountID)?.activeRouterSettings ?? RouterSettings(
-            enabled: false,
-            port: 38440,
-            upstreamBaseURL: upstreamURL,
-            routeModel: "codex-mini",
-            defaultModel: defaultModel,
-            supportsStreaming: true,
-            maxConcurrency: 0,
-            minIntervalMs: 0
-        )
-        let settings = RouterSettings(
-            enabled: existing.enabled,
-            port: existing.port,
-            upstreamBaseURL: upstreamURL,
-            routeModel: existing.routeModel.isEmpty ? "codex-mini" : existing.routeModel,
-            defaultModel: defaultModel,
-            supportsStreaming: true,
-            maxConcurrency: existing.maxConcurrency ?? 0,
-            minIntervalMs: existing.minIntervalMs ?? 0
-        )
-        accountManager.updateRouterSettings(settings, for: accountID)
-    }
-
     private func toggleLabel(routerEnabled: Bool, hasAPIKey: Bool) -> String {
         if !hasAPIKey { return "请先配置 API Key" }
         return routerEnabled ? "正在运行代理" : "启用本地路由代理"
