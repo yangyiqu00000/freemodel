@@ -233,14 +233,14 @@ struct CodexInjectionSettingsView: View {
             Button {
                 appLayer.deactivate()
             } label: {
-                Label("恢复默认（清空 ~/.codex/auth.json + config.toml）", systemImage: "arrow.uturn.backward.circle")
+                Label("恢复默认", systemImage: "arrow.uturn.backward.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
             .tint(.gray)
             .disabled(!isActive)
-            .help(isActive ? "删除本地 auth.json + config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
+            .help(isActive ? "清空 ~/.codex/auth.json + ~/.codex/config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
 
             // 删除按钮（不依赖 contextMenu）：触发父层 confirmationDialog
             Button(role: .destructive) {
