@@ -1985,11 +1985,6 @@ private extension View {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
     }
 
-    /// 详情区/菜单栏分段 Divider（4pt 垂直 padding），6 处共用
-    func sectionDivider() -> some View {
-        Divider().padding(.vertical, 4)
-    }
-
     /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
     func sectionVStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 16, content: content)

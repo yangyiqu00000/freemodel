@@ -30,5 +30,6 @@
 ./RouterManager.swift
 ./StatusBadge.swift
 ./SemanticColors.swift
+./ViewExtensions.swift
 ./SettingsView.swift
 ./SettingsWindowController.swift

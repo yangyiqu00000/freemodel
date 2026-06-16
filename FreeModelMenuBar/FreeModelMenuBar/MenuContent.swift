@@ -40,11 +40,11 @@ struct MenuContent: View {
             .padding(.bottom, 8)
 
             if accountManager.accounts.count > 1 {
-                Divider().padding(.vertical, 4)
+                sectionDivider()
                 accountSwitcher
             }
 
-            Divider().padding(.vertical, 4)
+            sectionDivider()
 
             if accountManager.activeAccount == nil {
                 noAccountView
@@ -64,11 +64,11 @@ struct MenuContent: View {
 
             // 本地路由卡片 (如果账号支持 API Key 查询或者开启了路由)
             if let account = accountManager.activeAccount, account.queryMode == .apiKey || account.activeRouterSettings.enabled {
-                Divider().padding(.vertical, 4)
+                sectionDivider()
                 routerStatusCard(account: account)
             }
 
-            Divider().padding(.vertical, 4)
+            sectionDivider()
 
             // 操作按钮
             HStack(spacing: 12) {
