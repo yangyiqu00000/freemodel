@@ -370,6 +370,7 @@ private enum AddKind { case account, codex }
                     return false
                 }()
             )
+            .tag(SidebarItem.logs)
         }
     }
     // MARK: - 侧边栏行 helper（含 contextMenu，避免 ForEach 体内 type-check 累积）
