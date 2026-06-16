@@ -1472,6 +1472,8 @@ private enum AddKind { case account, codex }
                             saveRouterSettings()
                         }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                        .frame(height: 28)
                         .disabled(!routerIsValid())
                     }
                     .padding(.top, 4)
