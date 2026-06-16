@@ -458,17 +458,11 @@ private enum AddKind { case account, codex }
         sidebarSectionHeader(
             title: "账号",
             systemImage: "person.2.fill",
-            trailing: AnyView(
-                Button {
-                    addExpanded = (addExpanded == .account) ? nil : .account
-                    if addExpanded == .account {
-                        newAccountLabel = "新账号 \(Self.shortNow())"
-                    }
-                } label: {
-                    Image(systemName: addExpanded == .account ? "minus" : "plus")
-                }
-                .buttonStyle(.borderless)
-                .help(addExpanded == .account ? "收起添加账号行" : "新增账号")
+            trailing: addExpandedToggleButton(
+                kind: .account,
+                onExpand: { newAccountLabel = "新账号 \(Self.shortNow())" },
+                helpExpand: "新增账号",
+                helpCollapse: "收起添加账号行"
             )
         )
     }
@@ -529,18 +523,14 @@ private enum AddKind { case account, codex }
         sidebarSectionHeader(
             title: "Codex 注入",
             systemImage: "key.horizontal.fill",
-            trailing: AnyView(
-                Button {
-                    addExpanded = (addExpanded == .codex) ? nil : .codex
-                    if addExpanded == .codex {
-                        newCodexLabel = "新配置 \(Self.shortNow())"
-                        newCodexProvider = "custom-\(Self.shortNow())"
-                    }
-                } label: {
-                    Image(systemName: addExpanded == .codex ? "minus" : "plus")
-                }
-                .buttonStyle(.borderless)
-                .help(addExpanded == .codex ? "收起添加注入配置行" : "添加一条新的注入配置")
+            trailing: addExpandedToggleButton(
+                kind: .codex,
+                onExpand: {
+                    newCodexLabel = "新配置 \(Self.shortNow())"
+                    newCodexProvider = "custom-\(Self.shortNow())"
+                },
+                helpExpand: "添加一条新的注入配置",
+                helpCollapse: "收起添加注入配置行"
             )
         )
     }
@@ -1866,6 +1856,30 @@ private enum AddKind { case account, codex }
             .frame(width: 56, alignment: .leading)
             .font(.caption)
             .foregroundStyle(.secondary)
+    }
+
+    /// 侧边栏 +号折叠 toggle 按钮（账号 / Codex 注入 2 处共用）
+    /// - kind: 要切换的 AddKind
+    /// - onExpand: 用户点 + 触发后回调（用于预填默认 label / provider）
+    /// - helpExpand / helpCollapse: 折叠/展开态的 help 文字
+    private func addExpandedToggleButton(
+        kind: AddKind,
+        onExpand: @escaping () -> Void,
+        helpExpand: String,
+        helpCollapse: String
+    ) -> AnyView {
+        AnyView(
+            Button {
+                addExpanded = (addExpanded == kind) ? nil : kind
+                if addExpanded == kind {
+                    onExpand()
+                }
+            } label: {
+                Image(systemName: addExpanded == kind ? "minus" : "plus")
+            }
+            .buttonStyle(.borderless)
+            .help(addExpanded == kind ? helpCollapse : helpExpand)
+        )
     }
 
     /// 侧边栏 section header（Label + headline + trailing 可选 + button），3 处共用
