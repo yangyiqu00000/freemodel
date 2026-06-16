@@ -1436,7 +1436,7 @@ private enum AddKind { case account, codex }
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                     if routerFieldEmpty(routerPort) {
-                                        Text("*").font(.caption2).foregroundStyle(.red)
+                                        requiredFieldStar()
                                     }
                                 }
                                 TextField("38440", text: $routerPort)
@@ -1451,7 +1451,7 @@ private enum AddKind { case account, codex }
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                     if routerFieldEmpty(routerUpstreamURL) {
-                                        Text("*").font(.caption2).foregroundStyle(.red)
+                                        requiredFieldStar()
                                     }
                                 }
                                 TextField("https://api.deepseek.com/v1", text: $routerUpstreamURL)
@@ -1473,7 +1473,7 @@ private enum AddKind { case account, codex }
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                 if routerFieldEmpty(routerRouteModel) {
-                                    Text("*").font(.caption2).foregroundStyle(.red)
+                                    requiredFieldStar()
                                 }
                             }
                             TextField("codex-mini", text: $routerRouteModel)
@@ -1486,7 +1486,7 @@ private enum AddKind { case account, codex }
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                 if routerFieldEmpty(routerDefaultModel) {
-                                    Text("*").font(.caption2).foregroundStyle(.red)
+                                    requiredFieldStar()
                                 }
                             }
                             TextField("deepseek-chat", text: $routerDefaultModel)
@@ -1779,6 +1779,13 @@ private enum AddKind { case account, codex }
     }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
+
+    /// 路由段必填字段红色星号 *（4 个 router 字段共用，0 risk）
+    private func requiredFieldStar() -> some View {
+        Text("*")
+            .font(.caption2)
+            .foregroundStyle(.red)
+    }
 
     /// 内联添加行字段标签：56pt 固定宽 + caption 灰底（与右侧 TextField 对齐），3 处共用
     private func fieldLabel(_ text: String) -> some View {
