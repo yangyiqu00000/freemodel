@@ -383,6 +383,18 @@ private enum AddKind { case account, codex }
                 }
                 Button {
                     NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(account.displayName, forType: .string)
+                } label: {
+                    Label("复制账号名", systemImage: "doc.on.doc.fill")
+                }
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(account.providerID, forType: .string)
+                } label: {
+                    Label("复制 Provider", systemImage: "doc.on.doc.fill")
+                }
+                Button {
+                    NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(account.id.uuidString, forType: .string)
                 } label: {
                     Label("复制账号 ID", systemImage: "doc.on.doc.fill")
@@ -410,10 +422,24 @@ private enum AddKind { case account, codex }
             .tag(SidebarItem.codexInjectionConfig(cfg.id))
             .contextMenu {
                 Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cfg.label, forType: .string)
+                } label: {
+                    Label("复制 label", systemImage: "doc.on.doc.fill")
+                }
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cfg.providerID, forType: .string)
+                } label: {
+                    Label("复制 Provider", systemImage: "doc.on.doc.fill")
+                }
+                Divider()
+                Button {
                     codexInjectionLayer.activateConfiguration(id: cfg.id)
                 } label: {
                     Label("激活", systemImage: "bolt.fill")
                 }
+                Divider()
                 Button(role: .destructive) {
                     pendingDeleteCodexConfig = cfg
                 } label: {
@@ -582,6 +608,7 @@ private enum AddKind { case account, codex }
         let statusColor: Color?
         let subtitleColor: Color
         var isSelected: Bool = false
+        @State private var isHovered: Bool = false
 
         init(icon: String,
              iconColor: Color = .secondary,
@@ -626,9 +653,19 @@ private enum AddKind { case account, codex }
             .padding(.horizontal, 4)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+                    .fill(backgroundFill)
             )
             .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovered = hovering
+            }
+        }
+
+        //  优先级：选中 (accent 0.18) > hover (secondary 0.10) > 透明
+        private var backgroundFill: Color {
+            if isSelected { return Color.accentColor.opacity(0.18) }
+            if isHovered  { return Color.secondary.opacity(0.10) }
+            return Color.clear
         }
     }
     // MARK: - 单条注入配置行
