@@ -400,7 +400,7 @@ private enum AddKind { case account, codex }
                 Button(role: .destructive) {
                     pendingDeleteAccount = account
                 } label: {
-                    Label("删除账号", systemImage: "trash")
+                    Label("删除账号", systemImage: "trash.fill")
                 }
             }
     }
@@ -417,7 +417,7 @@ private enum AddKind { case account, codex }
                 Button(role: .destructive) {
                     pendingDeleteCodexConfig = cfg
                 } label: {
-                    Label("删除", systemImage: "trash")
+                    Label("删除", systemImage: "trash.fill")
                 }
             }
     }
@@ -1588,7 +1588,7 @@ private enum AddKind { case account, codex }
                 .disabled(routerManager.logs.isEmpty)
 
                 Button(action: clearLogsWithToast) {
-                    Label("清除日志", systemImage: "trash")
+                    Label("清除日志", systemImage: "trash.fill")
                 }
                 .buttonStyle(.bordered)
                 .disabled(routerManager.logs.isEmpty)

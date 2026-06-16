@@ -246,7 +246,7 @@ struct CodexInjectionSettingsView: View {
             Button(role: .destructive) {
                 pendingDeleteCodexConfig = cfg
             } label: {
-                Label("删除", systemImage: "trash")
+                Label("删除", systemImage: "trash.fill")
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
