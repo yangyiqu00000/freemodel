@@ -161,7 +161,7 @@ private enum AddKind { case account, codex }
                                 header
 
                                 // 3 段平等逻辑：始终展开，用 Label + Divider 分段（不再折叠）
-                                sectionHeader("账号", systemImage: "person.text.rectangle")
+                                sectionHeader("账号", systemImage: "person.text.rectangle", statusColor: accountHeaderStatusColor(account))
                                 VStack(alignment: .leading, spacing: 18) {
                                     accountDetails(account)
                                     queryModeSection(account)
@@ -170,7 +170,7 @@ private enum AddKind { case account, codex }
 
                                 Divider().padding(.vertical, 4)
 
-                                sectionHeader("连接", systemImage: "link")
+                                sectionHeader("连接", systemImage: "link", statusColor: connectionHeaderStatusColor(account))
                                 VStack(alignment: .leading, spacing: 18) {
                                     dashboardSection(account)
                                     apiKeySection(account)
@@ -178,7 +178,7 @@ private enum AddKind { case account, codex }
 
                                 Divider().padding(.vertical, 4)
 
-                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle")
+                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerHeaderStatusColor())
                                 VStack(alignment: .leading, spacing: 18) {
                                     routerSection(account)
                                     customURLsSection(account)
@@ -1827,10 +1827,48 @@ private enum AddKind { case account, codex }
 
     // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
 
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.headline)
-            .padding(.top, 4)
+    private func sectionHeader(_ title: String, systemImage: String, statusColor: Color? = nil) -> some View {
+        HStack(spacing: 6) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            Spacer()
+            if let color = statusColor {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                    .help(headerDotHelp(for: title))
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    // MARK: - 详情区 header status dot help（按段标题返回对应解释）
+
+    private func headerDotHelp(for title: String) -> String {
+        switch title {
+        case "账号": return "账号信息已配置"
+        case "连接": return "控制台已登录且 API Key 已配置"
+        case "路由": return routerStatusSubtitle
+        default: return ""
+        }
+    }
+
+    // MARK: - 详情区 3 段 header status dot 计算（账号 / 连接 / 路由 子段健康度摘要）
+
+    private func accountHeaderStatusColor(_ account: ProviderAccount) -> Color? {
+        // 账号段：只要存在即绿（无有效语义"未配置账号"——账号就是当前选中）
+        return .green
+    }
+
+    private func connectionHeaderStatusColor(_ account: ProviderAccount) -> Color? {
+        // 连接段：控制台已登录 或 API Key 已设 = 绿；都未设 = 红
+        if account.hasDashboardSession || account.hasAPIKey { return .green }
+        return .red
+    }
+
+    private func routerHeaderStatusColor() -> Color? {
+        // 路由段：复用 routerStatusColor
+        return routerStatusColor(routerManager.status)
     }
 
     // MARK: - 路由状态颜色（顶栏 / 详情区 / 日志行 共用单一来源）
