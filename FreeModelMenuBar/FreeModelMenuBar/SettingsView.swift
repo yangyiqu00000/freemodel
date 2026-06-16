@@ -1129,7 +1129,7 @@ private enum AddKind { case account, codex }
         case .dashboard:
             status = account.hasDashboardSession ? "控制台已登录" : "控制台未登录"
         case .apiKey:
-            status = account.hasAPIKey ? "已设 Key" : "未设 Key"
+            status = account.hasAPIKey ? "已设 API Key" : "未设 API Key"
         }
         if let balance = account.lastBalance {
             return "\(balance.remainingFormatted) · \(status)"
