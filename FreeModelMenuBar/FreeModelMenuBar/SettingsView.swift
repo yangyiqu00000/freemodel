@@ -1685,28 +1685,14 @@ private enum AddKind { case account, codex }
         } else {
             logsClearedToast = "已清除 \(count) 条日志"
             // 3 秒后自动隐藏
-            logsClearedToastToken &+= 1
-            let token = logsClearedToastToken
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if logsClearedToastToken == token {
-                    withAnimation { logsClearedToast = nil }
-                }
-            }
+            autoHideToast(token: $logsClearedToastToken, value: $logsClearedToast)
         }
     }
 
     private func triggerBaseURLCopiedToast() {
         baseURLCopiedToast = "Base URL 已复制"
         // 3 秒后自动隐藏
-        baseURLCopiedToastToken &+= 1
-        let token = baseURLCopiedToastToken
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            if baseURLCopiedToastToken == token {
-                withAnimation { baseURLCopiedToast = nil }
-            }
-        }
+        autoHideToast(token: $baseURLCopiedToastToken, value: $baseURLCopiedToast)
     }
 
     private func copyAllLogs() {
@@ -1725,6 +1711,20 @@ private enum AddKind { case account, codex }
         }
         let allLogs = logTexts.joined(separator: "\n")
         ClipboardHelper.shared.copy(allLogs)
+    }
+
+    // MARK: - Toast 自动隐藏（token 模式防过期复活，3 处共用：logsCleared / baseURLCopied / urlPresetStatus）
+
+    /// toast 自动 3 秒后置 nil。token 自增 + 异步检查 token 防止用户在 3 秒内再次触发时旧 timer 复活旧 toast
+    private func autoHideToast<T: Equatable>(token: Binding<Int>, value: Binding<T?>, seconds: Double = 3.0) {
+        token.wrappedValue &+= 1
+        let currentToken = token.wrappedValue
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            if token.wrappedValue == currentToken {
+                withAnimation { value.wrappedValue = nil }
+            }
+        }
     }
 
     // MARK: - 路由状态文本（侧边栏日志行 + 详情区 header 共用）
@@ -1956,14 +1956,7 @@ private enum AddKind { case account, codex }
     private func triggerUrlPresetStatus(_ status: UrlPresetStatus) {
         urlPresetStatus = status
         // 3 秒后自动隐藏（与 logsClearedToast / baseURLCopiedToast 同模式，token 防过期 toast 复活）
-        urlPresetStatusToken &+= 1
-        let token = urlPresetStatusToken
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            if urlPresetStatusToken == token {
-                withAnimation { urlPresetStatus = nil }
-            }
-        }
+        autoHideToast(token: $urlPresetStatusToken, value: $urlPresetStatus)
     }
 }
 
