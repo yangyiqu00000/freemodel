@@ -176,7 +176,7 @@ private enum AddKind { case account, codex }
 
                                 Divider().padding(.vertical, 4)
 
-                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath")
+                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle")
                                 VStack(alignment: .leading, spacing: 18) {
                                     routerSection(account)
                                     customURLsSection(account)
