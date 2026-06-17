@@ -424,7 +424,7 @@ struct MenuContent: View {
                 .buttonStyle(.plain)
                 .disabled(!account.hasAPIKey)
                 
-                if routerManager.status == .running {
+                if routerManager.status.isRunning {
                     Button(action: {
                         ClipboardHelper.shared.copy(routerBaseURL(settings.port))
                     }) {

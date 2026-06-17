@@ -24,7 +24,7 @@ struct LogsConsoleView: View {
                     dotColor: routerManager.status.statusColor
                 )
                 if let activeAccount = accountManager.activeAccount {
-                    let isRunning = routerManager.status == .running
+                    let isRunning = routerManager.status.isRunning
                     let portVal = activeAccount.activeRouterSettings.port
                     let urlString = routerBaseURL(portVal)
                     Button(action: {
@@ -53,7 +53,7 @@ struct LogsConsoleView: View {
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
-                    if settings.enabled && routerManager.status == .running {
+                    if settings.enabled && routerManager.status.isRunning {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("监听")
                                 .font(.caption2)

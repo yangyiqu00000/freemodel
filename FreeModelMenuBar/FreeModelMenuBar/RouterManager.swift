@@ -43,6 +43,12 @@ enum RouterStatus: String, Codable, CaseIterable {
         case .off: return nil
         }
     }
+
+    // 路由已成功响应健康检查（= 可对外服务）
+    var isRunning: Bool { self == .running }
+
+    // 正在启动或已运行（UI 用作「忙碌中」禁用按钮）
+    var isBusy: Bool { self == .running || self == .starting }
 }
 
 struct RouterLogEntry: Identifiable, Codable, Equatable {
@@ -281,7 +287,7 @@ final class RouterManager: ObservableObject {
         process.terminationHandler = { [weak self] _ in
             DispatchQueue.main.async {
                 self?.appendLog("路由代理侧车进程已退出。")
-                if self?.status == .running || self?.status == .starting {
+                if self?.status.isBusy == true {
                     self?.status = .failed
                 }
                 self?.runningProcess = nil
@@ -397,7 +403,7 @@ final class RouterManager: ObservableObject {
                 self?.performHealthCheckRequest(port: port) { success in
                     if success {
                         self?.status = .running
-                        self?.appendLog("路由代理启动成功！监听地址: (routerBaseURL(port))")
+                        self?.appendLog("路由代理启动成功！监听地址: \(routerBaseURL(port))")
                         self?.healthCheckTimer?.cancel()
                     }
                 }
