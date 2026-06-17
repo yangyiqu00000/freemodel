@@ -14,6 +14,11 @@ struct AccountSettingsView: View {
     @State private var renameText: String = ""
     @State private var initialDisplayName: String = ""
 
+    // renameText 修剪后值，body 内多次复用避免重复 trimmingCharacters 扫描
+    private var trimmedRenameText: String {
+        renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private enum ApiKeyStatus: Equatable {
         case empty, unsaved, testing, verified, failed(String), saved
     }
@@ -87,17 +92,17 @@ struct AccountSettingsView: View {
                     .frame(maxWidth: .infinity)
                     .onSubmit {
                         if commitRename(input: renameText, accountID: account.id) {
-                            initialDisplayName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            initialDisplayName = trimmedRenameText
                         }
                     }
                 Button("重命名") {
                     if commitRename(input: renameText, accountID: account.id) {
-                        initialDisplayName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        initialDisplayName = trimmedRenameText
                     }
                 }
-                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if renameText.trimmingCharacters(in: .whitespacesAndNewlines) != initialDisplayName
-                    && !renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                .disabled(trimmedRenameText.isEmpty)
+                if trimmedRenameText != initialDisplayName
+                    && !trimmedRenameText.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "circle.dashed")
                             .foregroundStyle(.orange)
