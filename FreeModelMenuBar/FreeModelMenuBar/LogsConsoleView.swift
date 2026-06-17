@@ -180,19 +180,7 @@ struct LogsConsoleView: View {
     }
 
     private func copySingleLog(_ log: RouterLogEntry) {
-        let text: String
-        let timeStr = "[\(log.time)]"
-        let methodStr = log.method
-        if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
-            text = "\(timeStr) \(methodStr): \(log.error ?? "")"
-        } else {
-            var mainLog = "\(timeStr) \(methodStr): \(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)"
-            if let error = log.error {
-                mainLog += " - Err: \(error)"
-            }
-            text = mainLog
-        }
-        ClipboardHelper.shared.copy(text)
+        ClipboardHelper.shared.copy(formatLog(log))
     }
 
     private func clearLogsWithToast() {
@@ -203,21 +191,23 @@ struct LogsConsoleView: View {
     }
 
     private func copyAllLogs() {
-        let logTexts = routerManager.logs.reversed().map { log -> String in
-            let timeStr = "[\(log.time)]"
-            let methodStr = log.method
-            if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
-                return "\(timeStr) \(methodStr): \(log.error ?? "")"
-            } else {
-                var mainLog = "\(timeStr) \(methodStr): \(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)"
-                if let error = log.error {
-                    mainLog += " - Err: \(error)"
-                }
-                return mainLog
-            }
-        }
-        let allLogs = logTexts.joined(separator: "\n")
+        // logs[0] 是最新一条，反转后保持时间正序输出到剪贴板
+        let allLogs = routerManager.logs.reversed().map(formatLog).joined(separator: "\n")
         ClipboardHelper.shared.copy(allLogs)
+    }
+
+    // 日志行的可读字符串表示，单行/批量复制共用同一份格式
+    private func formatLog(_ log: RouterLogEntry) -> String {
+        let timeStr = "[\(log.time)]"
+        let methodStr = log.method
+        if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
+            return "\(timeStr) \(methodStr): \(log.error ?? "")"
+        }
+        var mainLog = "\(timeStr) \(methodStr): \(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)"
+        if let error = log.error {
+            mainLog += " - Err: \(error)"
+        }
+        return mainLog
     }
 
     private func showToast<T: Equatable>(_ value: T?, at binding: Binding<T?>, seconds: Double = 3.0) {
