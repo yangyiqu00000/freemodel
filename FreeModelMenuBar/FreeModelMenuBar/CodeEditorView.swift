@@ -24,7 +24,7 @@ struct CodeEditorView: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(.system(size: 12, design: .monospaced))
+            .font(.app(.editorBody))
             .foregroundStyle(.white)
             .scrollContentBackground(.hidden)
             .padding(8)

@@ -174,7 +174,7 @@ struct LogsConsoleView: View {
                     }
                 }
             }
-            .font(.system(size: 10, weight: .regular, design: .monospaced))
+            .font(.app(.logMono))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

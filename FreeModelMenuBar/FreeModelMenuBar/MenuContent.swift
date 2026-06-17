@@ -191,7 +191,7 @@ struct MenuContent: View {
     private var noAccountView: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 36))
+                .font(.app(.displayNumber))
                 .foregroundStyle(.orange)
 
             Text("还没有任何账号")
@@ -210,7 +210,7 @@ struct MenuContent: View {
             if let account = accountManager.activeAccount {
                 if account.queryMode == .dashboard {
                     Image(systemName: "person.crop.circle.badge.exclamationmark")
-                        .font(.system(size: 32))
+                        .font(.app(.displayNumber))
                         .foregroundStyle(.orange)
 
                     Text("尚未登录控制台")
@@ -223,7 +223,7 @@ struct MenuContent: View {
                         .multilineTextAlignment(.center)
                 } else {
                     Image(systemName: "key.fill")
-                        .font(.system(size: 32))
+                        .font(.app(.displayNumber))
                         .foregroundStyle(.orange)
 
                     Text("尚未配置 API Key")
@@ -251,7 +251,7 @@ struct MenuContent: View {
                     .foregroundStyle(.secondary)
 
                 Text(balance.remainingFormatted)
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.app(.displayNumber))
                     .foregroundStyle(balance.isExhausted ? .red : balance.isLow ? .orange : .green)
 
                 if balance.isLow && !balance.isExhausted {
@@ -382,7 +382,7 @@ struct MenuContent: View {
         }
 
         return Text(status.rawValue)
-            .font(.system(size: 9, weight: .bold))
+            .font(.app(.microLabel))
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .foregroundStyle(.white)
@@ -403,10 +403,10 @@ struct MenuContent: View {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("监听地址:")
-                        .font(.system(size: 9))
+                        .font(.app(.microTag))
                         .foregroundStyle(.secondary)
                     Text("http://127.0.0.1:\(String(settings.port))/v1")
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.app(.microTag))
                         .foregroundStyle(.blue)
                 }
                 Spacer()
@@ -415,7 +415,7 @@ struct MenuContent: View {
                     routerManager.toggleRouter()
                 }) {
                     Text(settings.enabled ? "停止" : "启动")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.app(.microLabel))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -429,7 +429,7 @@ struct MenuContent: View {
                         ClipboardHelper.shared.copy("http://127.0.0.1:\(settings.port)/v1")
                     }) {
                         Image(systemName: "doc.on.doc.fill")
-                            .font(.system(size: 10))
+                            .font(.app(.microTag))
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)

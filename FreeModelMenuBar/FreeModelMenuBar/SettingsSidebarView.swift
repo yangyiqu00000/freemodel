@@ -346,7 +346,7 @@ struct SettingsSidebarView: View {
         var body: some View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.app(.sidebarIcon))
                     .foregroundStyle(iconColor)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 1) {

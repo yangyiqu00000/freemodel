@@ -95,3 +95,56 @@ extension Binding where Value == Bool {
         )
     }
 }
+//
+//  AppTypography.swift
+//  FreeModelMenuBar
+//
+//  跨文件字号尺度（与 SemanticColors.swift 同级）。
+//  6 档 enum 替代散落在 3 个文件里的 14 处 .font(.system(size: ...))
+//  写死值，让"字号协调"有一个明确的参照系。
+//
+//  调 appFontScale 可一次性缩放所有 AppFont（仅影响 Font.appXxx 调用点，
+//  不影响 .headline / .caption / 等 SwiftUI 语义字体）
+//
+
+
+/// 全局字号缩放系数。默认 1.0；要"全局 +20%" 改 1.2 即可。
+let appFontScale: CGFloat = 1.0
+
+/// 应用字号档位（6 档：4 类小字号 + 1 档大数字）
+enum AppFont {
+    /// 9pt bold 徽章（菜单栏顶栏小标签）
+    case microLabel
+    /// 9-10pt 小说明文字（含 monospaced 变体）
+    case microTag
+    /// 12pt monospaced 编辑器正文
+    case editorBody
+    /// 10pt monospaced 日志行
+    case logMono
+    /// 14pt 侧栏小图标
+    case sidebarIcon
+    /// 32pt bold rounded 大数字展示
+    case displayNumber
+}
+
+extension Font {
+    /// 按 appFontScale 渲染的 AppFont
+    static func app(_ kind: AppFont) -> Font {
+        let base: Font
+        switch kind {
+        case .microLabel:
+            base = .system(size: 9 * appFontScale, weight: .bold, design: .default)
+        case .microTag:
+            base = .system(size: 10 * appFontScale, weight: .regular, design: .default)
+        case .editorBody:
+            base = .system(size: 12 * appFontScale, weight: .regular, design: .monospaced)
+        case .logMono:
+            base = .system(size: 10 * appFontScale, weight: .regular, design: .monospaced)
+        case .sidebarIcon:
+            base = .system(size: 14 * appFontScale, weight: .regular, design: .default)
+        case .displayNumber:
+            base = .system(size: 32 * appFontScale, weight: .bold, design: .rounded)
+        }
+        return base
+    }
+}

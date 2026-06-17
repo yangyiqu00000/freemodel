@@ -134,7 +134,7 @@ struct SettingsView: View {
             switch kind {
             case .noSelection:
                 Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 36))
+                    .font(.app(.displayNumber))
                     .foregroundStyle(.orange)
                 Text("还没有选中账号")
                     .font(.headline)
@@ -144,7 +144,7 @@ struct SettingsView: View {
                     .multilineTextAlignment(.center)
             case .accountGone:
                 Image(systemName: "questionmark.circle")
-                    .font(.system(size: 36))
+                    .font(.app(.displayNumber))
                     .foregroundStyle(.secondary)
                 Text("该账号已不存在")
                     .font(.headline)
