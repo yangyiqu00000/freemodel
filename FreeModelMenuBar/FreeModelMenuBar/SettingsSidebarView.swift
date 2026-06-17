@@ -22,17 +22,7 @@ struct SettingsSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            List(selection: Binding(
-                get: { selectedItem },
-                set: { newItem in
-                    if let newItem = newItem {
-                        selectedItem = newItem
-                        if case .account(let uuid) = newItem {
-                            selectAccountAndSync(id: uuid)
-                        }
-                    }
-                }
-            )) {
+            List {
                 accountsSection
                 codexSection
                 logsSection
@@ -90,7 +80,27 @@ struct SettingsSidebarView: View {
         Section(header: accountsSectionHeader) {
             if addExpanded == .account { accountsInlineAddRow }
             ForEach(accountManager.accounts) { account in
-                accountListRow(account)
+                Button {
+                    selectAccountAndSync(id: account.id)
+                } label: {
+                    accountRow(account)
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button {
+                        renameInput = account.displayName
+                        pendingRenameAccount = account
+                    } label: { Label("重命名", systemImage: "pencil") }
+                    Button { ClipboardHelper.shared.copy(account.displayName) } label: { Label("复制账号名", systemImage: "doc.on.doc.fill") }
+                    Button { ClipboardHelper.shared.copy(account.providerID) } label: { Label("复制 Provider", systemImage: "doc.on.doc.fill") }
+                    Button { ClipboardHelper.shared.copy(account.id.uuidString) } label: { Label("复制账号 ID", systemImage: "doc.on.doc.fill") }
+                    if account.id != accountManager.activeAccountID {
+                        Divider()
+                        Button { selectAccountAndSync(id: account.id) } label: { Label("设为活跃账号", systemImage: "checkmark.circle.fill") }
+                    }
+                    Divider()
+                    Button(role: .destructive) { pendingDeleteAccount = account } label: { Label("删除账号", systemImage: "trash.fill") }
+                }
             }
         }
     }
@@ -99,28 +109,36 @@ struct SettingsSidebarView: View {
         Section(header: codexSectionHeader) {
             if addExpanded == .codex { codexInlineAddRow }
             ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
-                codexConfigListRow(cfg)
+                Button {
+                    selectedItem = .codexInjectionConfig(cfg.id)
+                } label: {
+                    codexConfigListRow(cfg)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
     private var logsSection: some View {
         Section(header: sidebarSectionHeader(title: "运行日志", systemImage: "terminal.fill")) {
-            SidebarRow(
-                icon: "terminal.fill",
-                iconColor: routerManager.status.statusColor ?? .secondary,
-                title: "运行日志",
-                subtitle: routerManager.status.subtitle,
-                statusColor: routerManager.status.statusColor,
-                isSelected: { if case .logs = selectedItem { return true }; return false }()
-            )
-            .tag(SettingsView.SidebarItem.logs)
+            Button {
+                selectedItem = .logs
+            } label: {
+                SidebarRow(
+                    icon: "terminal.fill",
+                    iconColor: routerManager.status.statusColor ?? .secondary,
+                    title: "运行日志",
+                    subtitle: routerManager.status.subtitle,
+                    statusColor: routerManager.status.statusColor,
+                    isSelected: { if case .logs = selectedItem { return true }; return false }()
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
     private func accountListRow(_ account: ProviderAccount) -> some View {
         accountRow(account)
-            .tag(SettingsView.SidebarItem.account(account.id))
             .contextMenu {
                 Button {
                     renameInput = account.displayName
@@ -140,7 +158,6 @@ struct SettingsSidebarView: View {
 
     private func codexConfigListRow(_ cfg: InjectionConfiguration) -> some View {
         codexConfigRow(cfg)
-            .tag(SettingsView.SidebarItem.codexInjectionConfig(cfg.id))
             .contextMenu {
                 Button { ClipboardHelper.shared.copy(cfg.label) } label: { Label("复制 label", systemImage: "doc.on.doc.fill") }
                 Button { ClipboardHelper.shared.copy(cfg.providerID) } label: { Label("复制 Provider", systemImage: "doc.on.doc.fill") }
@@ -288,8 +305,7 @@ struct SettingsSidebarView: View {
     }
 
     private func isAccountSelected(_ id: UUID) -> Bool {
-        if case .account(let selectedID) = selectedItem, selectedID == id { return true }
-        return false
+        accountManager.activeAccountID == id
     }
 
     private func accountStatusText(_ account: ProviderAccount) -> String {
@@ -320,6 +336,7 @@ struct SettingsSidebarView: View {
     private func selectAccountAndSync(id: UUID) {
         accountManager.selectAccount(id: id)
         balanceManager.syncFromActiveAccount()
+        selectedItem = .account(id)
     }
 
     private func deleteAccountAndSync(id: UUID) {

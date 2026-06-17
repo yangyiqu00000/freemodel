@@ -52,26 +52,33 @@ struct SettingsView: View {
                     // 添加成功 toast（3 处共用：账号 4 chip / Codex 官方 / Codex 第三方）
                     toastBadge(value: accountCreatedToast, icon: "person.crop.circle.badge.checkmark", tint: .green)
                     toastBadge(value: codexConfigCreatedToast, icon: "key.horizontal.fill", tint: .blue)
-                    if accountManager.activeAccountID != nil,
-                       accountManager.accounts.contains(where: { $0.id == accountManager.activeAccountID! }) {
-                        AccountSettingsView(
-                            accountID: accountManager.activeAccountID!,
-                            accountManager: accountManager,
-                            balanceManager: balanceManager,
-                            routerManager: routerManager,
-                            pendingScrollToAPIKey: $pendingScrollToAPIKey
-                        )
-                    } else if case .codexInjectionConfig(let cfgID) = selectedItem {
-                        CodexInjectionSettingsView(
-                            appLayer: codexInjectionLayer,
-                            configurationID: cfgID,
-                            pendingDeleteCodexConfig: $pendingDeleteCodexConfig
-                        )
-                    } else if case .logs = selectedItem {
-                        LogsConsoleView(
-                            routerManager: routerManager,
-                            accountManager: accountManager
-                        )
+                    if let selected = selectedItem {
+                        switch selected {
+                        case .account(let accountID):
+                            if accountManager.accounts.contains(where: { $0.id == accountID }) {
+                                AccountSettingsView(
+                                    accountID: accountID,
+                                    accountManager: accountManager,
+                                    balanceManager: balanceManager,
+                                    routerManager: routerManager,
+                                    pendingScrollToAPIKey: $pendingScrollToAPIKey
+                                )
+                                .id(accountID)
+                            } else {
+                                emptyStateView(.accountGone)
+                            }
+                        case .codexInjectionConfig(let cfgID):
+                            CodexInjectionSettingsView(
+                                appLayer: codexInjectionLayer,
+                                configurationID: cfgID,
+                                pendingDeleteCodexConfig: $pendingDeleteCodexConfig
+                            )
+                        case .logs:
+                            LogsConsoleView(
+                                routerManager: routerManager,
+                                accountManager: accountManager
+                            )
+                        }
                     } else {
                         emptyStateView(.noSelection)
                     }

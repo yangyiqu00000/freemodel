@@ -1,11 +1,15 @@
 import SwiftUI
 
 struct AccountSettingsView: View {
-    let account: ProviderAccount
+    let accountID: UUID
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var balanceManager: BalanceManager
     @ObservedObject var routerManager: RouterManager
     @Binding var pendingScrollToAPIKey: Bool
+
+    private var account: ProviderAccount? {
+        accountManager.account(id: accountID)
+    }
 
     @State private var renameText: String = ""
     @State private var initialDisplayName: String = ""
@@ -18,29 +22,39 @@ struct AccountSettingsView: View {
     @State private var showAPIKey: Bool = false
     @State private var isTesting: Bool = false
 
+    @ViewBuilder
     var body: some View {
         header
+            .onAppear(perform: loadFromAccount)
+            .onChange(of: accountID) { _ in loadFromAccount() }
 
+        if let account {
+            accountContent(account)
+        }
+    }
+
+    @ViewBuilder
+    private func accountContent(_ account: ProviderAccount) -> some View {
         sectionHeader("账号", systemImage: "person.text.rectangle", statusColor: accountHeaderStatusColor(account))
         sectionVStack {
-            accountDetails
-            queryModeSection
-            linksSection
+            accountDetails(account)
+            queryModeSection(account)
+            linksSection(account)
         }
 
         sectionDivider()
 
         sectionHeader("连接", systemImage: "link", statusColor: connectionHeaderStatusColor(account))
         sectionVStack {
-            dashboardSection
-            apiKeySection
+            dashboardSection(account)
+            apiKeySection(account)
         }
 
         sectionDivider()
 
         sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerManager.status.statusColor)
         RouterSettingsView(
-            account: account,
+            accountID: accountID,
             accountManager: accountManager,
             routerManager: routerManager,
             pendingScrollToAPIKey: $pendingScrollToAPIKey
@@ -58,13 +72,11 @@ struct AccountSettingsView: View {
     }
 
     private var headerSubtitle: String {
-        let accountCount = accountManager.accounts.count
-        let codexCount = accountManager.accounts.count
-        let accountPart = accountCount == 0 ? "无账号" : "\(accountCount) 个账号"
-        return "\(accountPart) · \(codexCount) 条注入"
+        let count = accountManager.accounts.count
+        return count == 0 ? "无账号" : "\(count) 个账号"
     }
 
-    private var accountDetails: some View {
+    private func accountDetails(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("账号信息", systemImage: "person.text.rectangle")
                 .font(.headline)
@@ -107,7 +119,7 @@ struct AccountSettingsView: View {
         .sectionPanel()
     }
 
-    private var dashboardSection: some View {
+    private func dashboardSection(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("控制台登录", systemImage: "person.crop.circle.badge.checkmark")
                 .font(.headline)
@@ -173,7 +185,7 @@ struct AccountSettingsView: View {
         .sectionPanel()
     }
 
-    private var apiKeySection: some View {
+    private func apiKeySection(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("API Key", systemImage: "key.fill")
                 .id("apiKeyAnchor")
@@ -262,7 +274,7 @@ struct AccountSettingsView: View {
         .sectionPanel()
     }
 
-    private var linksSection: some View {
+    private func linksSection(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("快捷链接", systemImage: "link")
                 .font(.headline)
@@ -282,7 +294,7 @@ struct AccountSettingsView: View {
         .sectionPanel()
     }
 
-    private var queryModeSection: some View {
+    private func queryModeSection(_ account: ProviderAccount) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("查询额度方式", systemImage: "magnifyingglass.circle.fill")
                 .font(.headline)
@@ -350,6 +362,13 @@ struct AccountSettingsView: View {
                 }
             }
         }
+    }
+
+    private func loadFromAccount() {
+        renameText = account?.displayName ?? ""
+        initialDisplayName = account?.displayName ?? ""
+        apiKeyInput = account?.apiKey ?? ""
+        apiKeyStatus = .unsaved
     }
 
     private func tag(_ text: String, systemImage: String) -> some View {

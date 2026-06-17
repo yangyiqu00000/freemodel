@@ -104,10 +104,14 @@ extension RouterEditingState {
 // MARK: - RouterSettingsView
 
 struct RouterSettingsView: View {
-    let account: ProviderAccount
+    let accountID: UUID
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var routerManager: RouterManager
     @Binding var pendingScrollToAPIKey: Bool
+
+    private var account: ProviderAccount? {
+        accountManager.account(id: accountID)
+    }
 
     @State private var editing = RouterEditingState()
     @State private var initial = RouterEditingState()
@@ -132,10 +136,11 @@ struct RouterSettingsView: View {
             refreshSection
         }
         .onAppear(perform: loadFromAccount)
-        .onChange(of: account.id) { _ in loadFromAccount() }
+        .onChange(of: accountID) { _ in loadFromAccount() }
     }
 
     private func loadFromAccount() {
+        guard let account else { return }
         let s = account.activeRouterSettings
         editing = RouterEditingState(from: s)
         initial = RouterEditingState(from: s)
@@ -147,6 +152,8 @@ struct RouterSettingsView: View {
     }
 
     // MARK: - 路由主内容
+
+    private var hasAPIKey: Bool { account?.hasAPIKey ?? false }
 
     private var routerContent: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -182,18 +189,18 @@ struct RouterSettingsView: View {
                     get: { editing.enabled },
                     set: { editing.enabled = $0 }
                 )) {
-                    Text(toggleLabel(routerEnabled: editing.enabled, hasAPIKey: account.hasAPIKey))
+                    Text(toggleLabel(routerEnabled: editing.enabled, hasAPIKey: hasAPIKey))
                         .fontWeight(.semibold)
-                        .foregroundStyle(account.hasAPIKey ? Color.primary : .red)
+                        .foregroundStyle(hasAPIKey ? Color.primary : .red)
                 }
-                .disabled(!account.hasAPIKey)
+                .disabled(!hasAPIKey)
 
                 Spacer()
             }
             .padding(.vertical, 4)
 
             // 缺 API Key 提示
-            if !account.hasAPIKey {
+            if !hasAPIKey {
                 missingAPIKeyWarning
             }
 
@@ -399,7 +406,7 @@ struct RouterSettingsView: View {
             }
 
             Button("保存服务器地址") {
-                accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
+                accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: accountID)
                 initialApiURL = apiURLInput
                 initialDashboardURL = dashboardURLInput
             }
@@ -426,7 +433,7 @@ struct RouterSettingsView: View {
             }
             .pickerStyle(.segmented)
             .onChange(of: selectedRefreshInterval) { newValue in
-                accountManager.updateRefreshInterval(newValue, for: account.id)
+                accountManager.updateRefreshInterval(newValue, for: accountID)
             }
 
             Text("控制台模式自动重新抓取余额的频率。API Key 模式不消耗此设置。")
@@ -479,7 +486,7 @@ struct RouterSettingsView: View {
     }
 
     private func isPresetActive(_ preset: ProviderPreset) -> Bool {
-        account.apiBaseURL == preset.config.apiURL
+        account?.apiBaseURL == preset.config.apiURL
     }
 
     private func providerPresetChip(preset: ProviderPreset) -> some View {
@@ -500,8 +507,8 @@ struct RouterSettingsView: View {
 
     private func applyProviderPreset(_ preset: ProviderPreset) {
         let cfg = preset.config
-        accountManager.updateURLs(apiURL: cfg.apiURL, dashboardURL: cfg.dashboardURL, for: account.id)
-        accountManager.updateQueryMode(cfg.queryMode, for: account.id)
+        accountManager.updateURLs(apiURL: cfg.apiURL, dashboardURL: cfg.dashboardURL, for: accountID)
+        accountManager.updateQueryMode(cfg.queryMode, for: accountID)
         editing.upstreamURL = cfg.routerUpstream
         editing.defaultModel = cfg.defaultModel
         editing.routeModel = cfg.routeModel
@@ -513,7 +520,7 @@ struct RouterSettingsView: View {
 
     private func saveRouterSettings() {
         let newSettings = editing.toRouterSettings()
-        accountManager.updateRouterSettings(newSettings, for: account.id)
+        accountManager.updateRouterSettings(newSettings, for: accountID)
         routerManager.syncStateWithActiveAccount()
     }
 }
