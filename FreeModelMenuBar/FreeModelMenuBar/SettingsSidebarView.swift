@@ -1,7 +1,5 @@
 import SwiftUI
 
-enum AddKind { case account, codex }
-
 struct SettingsSidebarView: View {
     @Binding var selectedItem: SettingsView.SidebarItem?
     @ObservedObject var accountManager: AccountManager
@@ -12,10 +10,8 @@ struct SettingsSidebarView: View {
     @Binding var codexToast: String?
     @Binding var pendingDeleteCodexConfig: InjectionConfiguration?
 
-    @State private var addExpanded: AddKind?
-    @State private var newAccountLabel: String = ""
-    @State private var newCodexLabel: String = ""
-    @State private var newCodexProvider: String = ""
+    @State private var showAddAccount: Bool = false
+    @State private var showAddCodexConfig: Bool = false
     @State private var pendingDeleteAccount: ProviderAccount?
     @State private var pendingRenameAccount: ProviderAccount?
     @State private var renameInput: String = ""
@@ -28,6 +24,31 @@ struct SettingsSidebarView: View {
                 logsSection
             }
             .listStyle(.sidebar)
+        }
+        .sheet(isPresented: $showAddAccount) {
+            AddAccountSheet(
+                defaultLabel: "新账号 \(shortNow())",
+                onPickProvider: { label, providerID, providerDisplayName in
+                    showAddAccount = false
+                    commitAccountCreation(label: label, providerID: providerID, providerDisplayName: providerDisplayName)
+                },
+                onCancel: { showAddAccount = false }
+            )
+        }
+        .sheet(isPresented: $showAddCodexConfig) {
+            AddCodexConfigSheet(
+                defaultLabel: "新配置 \(shortNow())",
+                defaultProviderID: "custom-\(shortNow())",
+                onPickOfficial: { label in
+                    showAddCodexConfig = false
+                    commitCodexOfficialCreation(label: label)
+                },
+                onPickThirdParty: { label, providerID in
+                    showAddCodexConfig = false
+                    commitCodexThirdPartyCreation(label: label, providerID: providerID)
+                },
+                onCancel: { showAddCodexConfig = false }
+            )
         }
         .confirmationDialog(
             "确定删除账号 \"\(pendingDeleteAccount?.displayName ?? "")\" ？",
@@ -78,7 +99,6 @@ struct SettingsSidebarView: View {
 
     private var accountsSection: some View {
         Section(header: accountsSectionHeader) {
-            if addExpanded == .account { accountsInlineAddRow }
             ForEach(accountManager.accounts) { account in
                 Button {
                     selectAccountAndSync(id: account.id)
@@ -107,7 +127,6 @@ struct SettingsSidebarView: View {
 
     private var codexSection: some View {
         Section(header: codexSectionHeader) {
-            if addExpanded == .codex { codexInlineAddRow }
             ForEach(codexInjectionLayer.injectionConfigurations) { cfg in
                 Button {
                     selectedItem = .codexInjectionConfig(cfg.id)
@@ -170,112 +189,26 @@ struct SettingsSidebarView: View {
 
     private var accountsSectionHeader: some View {
         sidebarSectionHeader(title: "账号", systemImage: "person.2.fill") {
-            addExpandedToggleButton(
-                kind: .account,
-                onExpand: { newAccountLabel = "新账号 \(shortNow())" },
-                helpExpand: "新增账号",
-                helpCollapse: "收起添加账号行"
-            )
+            Button {
+                showAddAccount = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("新增账号")
         }
-    }
-
-    private var accountsInlineAddRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                fieldLabel("名称")
-                TextField("例如：我的 DeepSeek", text: $newAccountLabel)
-                    .textFieldStyle(.roundedBorder)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("种类").frame(maxWidth: .infinity, alignment: .leading).font(.caption).foregroundStyle(.secondary)
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 6),
-                    GridItem(.flexible(), spacing: 6)
-                ], spacing: 6) {
-                    Button { commitAccountCreation(providerID: "freemodel", providerDisplayName: "FreeModel 网页") } label: {
-                        Label("FreeModel 网页", systemImage: "globe").frame(maxWidth: .infinity)
-                    }
-                    Button { commitAccountCreation(providerID: "deepseek", providerDisplayName: "DeepSeek API") } label: {
-                        Label("DeepSeek API", systemImage: "key.fill").frame(maxWidth: .infinity)
-                    }
-                    Button { commitAccountCreation(providerID: "openrouter", providerDisplayName: "OpenRouter API") } label: {
-                        Label("OpenRouter API", systemImage: "arrow.triangle.branch").frame(maxWidth: .infinity)
-                    }
-                    Button { commitAccountCreation(providerID: "modelscope", providerDisplayName: "ModelScope API") } label: {
-                        Label("ModelScope API", systemImage: "cube").frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            HStack {
-                Spacer()
-                Button("取消") { addExpanded = nil }
-            }
-        }
-        .font(.caption)
-        .addRowPanel()
     }
 
     private var codexSectionHeader: some View {
         sidebarSectionHeader(title: "Codex 注入", systemImage: "key.horizontal.fill") {
-            addExpandedToggleButton(
-                kind: .codex,
-                onExpand: {
-                    newCodexLabel = "新配置 \(shortNow())"
-                    newCodexProvider = "custom-\(shortNow())"
-                },
-                helpExpand: "添加一条新的注入配置",
-                helpCollapse: "收起添加注入配置行"
-            )
+            Button {
+                showAddCodexConfig = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("添加一条新的注入配置")
         }
-    }
-
-    private var codexInlineAddRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                fieldLabel("标签")
-                TextField("例如：本地 relay", text: $newCodexLabel)
-                    .textFieldStyle(.roundedBorder)
-            }
-            HStack {
-                fieldLabel("Provider")
-                TextField("例如：local-relay", text: $newCodexProvider)
-                    .textFieldStyle(.roundedBorder)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("种类").frame(maxWidth: .infinity, alignment: .leading).font(.caption).foregroundStyle(.secondary)
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 6),
-                    GridItem(.flexible(), spacing: 6)
-                ], spacing: 6) {
-                    Button {
-                        codexInjectionLayer.prepareOfficialLoginSession(label: newCodexLabel)
-                        addExpanded = nil
-                        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
-                            selectedItem = .codexInjectionConfig(newID)
-                        }
-                        showToast("已添加：\(newCodexLabel) · 官方", at: $codexToast)
-                    } label: {
-                        Label("官方", systemImage: "person.crop.circle.badge.checkmark").frame(maxWidth: .infinity)
-                    }
-                    Button {
-                        codexInjectionLayer.addEmptyThirdPartyConfiguration(label: newCodexLabel, providerID: newCodexProvider)
-                        addExpanded = nil
-                        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
-                            selectedItem = .codexInjectionConfig(newID)
-                        }
-                        showToast("已添加：\(newCodexLabel) · 第三方", at: $codexToast)
-                    } label: {
-                        Label("第三方", systemImage: "square.and.pencil").frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            HStack {
-                Spacer()
-                Button("取消") { addExpanded = nil }
-            }
-        }
-        .font(.caption)
-        .addRowPanel()
     }
 
     private func accountRow(_ account: ProviderAccount) -> some View {
@@ -320,11 +253,34 @@ struct SettingsSidebarView: View {
         return status
     }
 
-    private func commitAccountCreation(providerID: String, providerDisplayName: String) {
-        let account = accountManager.createAccount(displayName: newAccountLabel, providerID: providerID)
+    private func commitAccountCreation(label: String, providerID: String, providerDisplayName: String) {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalLabel = trimmed.isEmpty ? "新账号 \(shortNow())" : trimmed
+        let account = accountManager.createAccount(displayName: finalLabel, providerID: providerID)
         selectAccountAndSync(id: account.id)
-        addExpanded = nil
         showToast("已添加：\(account.displayName) · \(providerDisplayName)", at: $accountToast)
+    }
+
+    private func commitCodexOfficialCreation(label: String) {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalLabel = trimmed.isEmpty ? "新配置 \(shortNow())" : trimmed
+        codexInjectionLayer.prepareOfficialLoginSession(label: finalLabel)
+        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
+            selectedItem = .codexInjectionConfig(newID)
+        }
+        showToast("已添加：\(finalLabel) · 官方", at: $codexToast)
+    }
+
+    private func commitCodexThirdPartyCreation(label: String, providerID: String) {
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedProvider = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalLabel = trimmedLabel.isEmpty ? "新配置 \(shortNow())" : trimmedLabel
+        let finalProvider = trimmedProvider.isEmpty ? "custom-\(shortNow())" : trimmedProvider
+        codexInjectionLayer.addEmptyThirdPartyConfiguration(label: finalLabel, providerID: finalProvider)
+        if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
+            selectedItem = .codexInjectionConfig(newID)
+        }
+        showToast("已添加：\(finalLabel) · 第三方", at: $codexToast)
     }
 
     private func commitRename(input: String, accountID: UUID) {
@@ -354,29 +310,6 @@ struct SettingsSidebarView: View {
     }
 
     private func shortNow() -> String { Self.shortNow() }
-
-    private func fieldLabel(_ text: String) -> some View {
-        Text(text)
-            .frame(width: 56, alignment: .leading)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-
-    private func addExpandedToggleButton(
-        kind: AddKind,
-        onExpand: @escaping () -> Void,
-        helpExpand: String,
-        helpCollapse: String
-    ) -> some View {
-        Button {
-            addExpanded = (addExpanded == kind) ? nil : kind
-            if addExpanded == kind { onExpand() }
-        } label: {
-            Image(systemName: addExpanded == kind ? "minus" : "plus")
-        }
-        .buttonStyle(.borderless)
-        .help(addExpanded == kind ? helpCollapse : helpExpand)
-    }
 
     private func sidebarSectionHeader<Trailing: View>(title: String, systemImage: String, @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack {
@@ -451,5 +384,153 @@ struct SettingsSidebarView: View {
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             withAnimation { binding.wrappedValue = nil }
         }
+    }
+}
+
+// MARK: - AddAccountSheet
+
+private struct AddAccountSheet: View {
+    let defaultLabel: String
+    let onPickProvider: (_ label: String, _ providerID: String, _ providerDisplayName: String) -> Void
+    let onCancel: () -> Void
+
+    @State private var label: String = ""
+    @State private var labelDidInit: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                fieldLabel("名称")
+                TextField("例如：我的 DeepSeek", text: $label)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(submit)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("种类")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 6),
+                    GridItem(.flexible(), spacing: 6)
+                ], spacing: 6) {
+                    Button { onPickProvider(label, "freemodel", "FreeModel 网页") } label: {
+                        Label("FreeModel 网页", systemImage: "globe").frame(maxWidth: .infinity)
+                    }
+                    Button { onPickProvider(label, "deepseek", "DeepSeek API") } label: {
+                        Label("DeepSeek API", systemImage: "key.fill").frame(maxWidth: .infinity)
+                    }
+                    Button { onPickProvider(label, "openrouter", "OpenRouter API") } label: {
+                        Label("OpenRouter API", systemImage: "arrow.triangle.branch").frame(maxWidth: .infinity)
+                    }
+                    Button { onPickProvider(label, "modelscope", "ModelScope API") } label: {
+                        Label("ModelScope API", systemImage: "cube").frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .font(.caption)
+        .padding(16)
+        .frame(width: 360)
+        .onAppear {
+            if !labelDidInit {
+                label = defaultLabel
+                labelDidInit = true
+            }
+        }
+    }
+
+    private func submit() {
+        // chip 按钮直接触发 onPickProvider；此函数保留以支持 TextField 回车（目前无选择时不创建）
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text)
+            .frame(width: 56, alignment: .leading)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - AddCodexConfigSheet
+
+private struct AddCodexConfigSheet: View {
+    let defaultLabel: String
+    let defaultProviderID: String
+    let onPickOfficial: (_ label: String) -> Void
+    let onPickThirdParty: (_ label: String, _ providerID: String) -> Void
+    let onCancel: () -> Void
+
+    @State private var label: String = ""
+    @State private var providerID: String = ""
+    @State private var didInit: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                fieldLabel("标签")
+                TextField("例如：本地 relay", text: $label)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                fieldLabel("Provider")
+                TextField("例如：local-relay", text: $providerID)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("种类")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 6),
+                    GridItem(.flexible(), spacing: 6)
+                ], spacing: 6) {
+                    Button {
+                        onPickOfficial(label)
+                    } label: {
+                        Label("官方", systemImage: "person.crop.circle.badge.checkmark")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        onPickThirdParty(label, providerID)
+                    } label: {
+                        Label("第三方", systemImage: "square.and.pencil")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .font(.caption)
+        .padding(16)
+        .frame(width: 360)
+        .onAppear {
+            if !didInit {
+                label = defaultLabel
+                providerID = defaultProviderID
+                didInit = true
+            }
+        }
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text)
+            .frame(width: 64, alignment: .leading)
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
