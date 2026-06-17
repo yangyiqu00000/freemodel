@@ -55,6 +55,8 @@ if [ -d "$APP_PATH" ]; then
         cp -R "$APP_PATH" "$DESKTOP_PATH/"
         echo "🔒 清理属性并重新签名..."
         xattr -cr "$DESKTOP_PATH/FreeModelMenuBar.app"
+        # 先移除旧签名再重签，避免 FinderInfo 残留导致 codesign verify 失败
+        codesign --remove-signature "$DESKTOP_PATH/FreeModelMenuBar.app" 2>/dev/null
         codesign --force --deep --sign - "$DESKTOP_PATH/FreeModelMenuBar.app"
         echo "✅ 已复制并签名到桌面: $DESKTOP_PATH/FreeModelMenuBar.app"
     fi

@@ -36,6 +36,16 @@ struct FreeModelMenuBarApp: App {
                 Image(systemName: balanceManager.isLoading ? "arrow.triangle.2.circlepath" : "dollarsign.circle.fill")
                     .loadingPulse(isActive: balanceManager.isLoading)
             }
+            .onAppear {
+                // 如果未配置账号，在应用启动时自动打开设置界面，避免用户因没有窗口误以为程序打不开
+                if !balanceManager.isConfigured {
+                    SettingsWindowController.shared.openSettings(
+                        balanceManager: balanceManager,
+                        accountManager: accountManager,
+                        routerManager: routerManager
+                    )
+                }
+            }
         }
         .menuBarExtraStyle(.window)
 
