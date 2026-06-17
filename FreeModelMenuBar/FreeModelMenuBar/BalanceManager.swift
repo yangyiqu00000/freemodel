@@ -115,12 +115,12 @@ class BalanceManager: ObservableObject {
     func fetchBalance() async {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         guard let account = accountManager.activeAccount else {
             self.balanceInfo = nil
             self.lastRefreshDate = nil
             self.errorMessage = "请先在设置中添加账号"
-            self.isLoading = false
             return
         }
 
@@ -130,7 +130,6 @@ class BalanceManager: ObservableObject {
                 self.balanceInfo = account.lastBalance
                 self.lastRefreshDate = account.lastRefreshDate
                 self.errorMessage = FreeModelError.dashboardLoginRequired.errorDescription
-                self.isLoading = false
                 return
             }
 
@@ -139,14 +138,11 @@ class BalanceManager: ObservableObject {
                 accountManager.updateBalance(result, for: account.id)
                 self.balanceInfo = result
                 self.lastRefreshDate = result.lastUpdated
-                self.isLoading = false
             } catch FreeModelError.dashboardLoginRequired {
                 self.balanceInfo = nil
                 self.errorMessage = FreeModelError.dashboardLoginRequired.errorDescription
-                self.isLoading = false
             } catch {
                 self.errorMessage = (error as? FreeModelError)?.errorDescription ?? error.localizedDescription
-                self.isLoading = false
             }
 
         case .apiKey:
@@ -154,7 +150,6 @@ class BalanceManager: ObservableObject {
                 self.balanceInfo = account.lastBalance
                 self.lastRefreshDate = account.lastRefreshDate
                 self.errorMessage = "请先在设置中配置 API Key"
-                self.isLoading = false
                 return
             }
 
@@ -178,7 +173,6 @@ class BalanceManager: ObservableObject {
             }
 
             if fetchSuccess {
-                self.isLoading = false
                 return
             }
 
@@ -189,7 +183,6 @@ class BalanceManager: ObservableObject {
             } catch {
                 self.errorMessage = lastError?.errorDescription ?? "无法连接到 FreeModel API"
             }
-            self.isLoading = false
         }
     }
 
