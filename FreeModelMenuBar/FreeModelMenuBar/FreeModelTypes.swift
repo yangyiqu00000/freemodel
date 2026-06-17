@@ -36,17 +36,14 @@ struct BalanceInfo: Codable, Equatable {
         (currency == "CNY" || currency == "人民币") ? "￥" : "$"
     }
 
-    var remainingFormatted: String {
-        String(format: "%@%.2f", currencySymbol, totalRemaining)
+    /// 统一 3 个 *Formatted 字段，避免各处重复 String(format:)
+    private func formatAmount(_ value: Double) -> String {
+        String(format: "%@%.2f", currencySymbol, value)
     }
 
-    var usedFormatted: String {
-        String(format: "%@%.2f", currencySymbol, totalUsed)
-    }
-
-    var totalFormatted: String {
-        String(format: "%@%.2f", currencySymbol, totalGranted)
-    }
+    var remainingFormatted: String { formatAmount(totalRemaining) }
+    var usedFormatted: String { formatAmount(totalUsed) }
+    var totalFormatted: String { formatAmount(totalGranted) }
 
     var usagePercentage: Double {
         guard totalGranted > 0 else { return 0 }
