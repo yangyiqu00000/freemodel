@@ -24,12 +24,17 @@ echo "🧹 清理之前的构建..."
 rm -rf build
 
 # 编译 Release 版本
+# CODE_SIGNING_ALLOWED=NO：跳过 xcodebuild 内置 CodeSign phase。
+# 原因：构建产物 .app bundle 根目录常带 com.apple.FinderInfo（macOS Sequoia
+# 文件提供者同步标记），会让内置 codesign 报 "resource fork / Finder
+# information not allowed" 而失败。签名交由下方复制到桌面后统一做。
 echo "🔨 编译 Release 版本..."
 xcodebuild \
     -project FreeModelMenuBar.xcodeproj \
     -scheme FreeModelMenuBar \
     -configuration Release \
     -derivedDataPath build/DerivedData \
+    CODE_SIGNING_ALLOWED=NO \
     build
 
 # 找到编译好的应用
