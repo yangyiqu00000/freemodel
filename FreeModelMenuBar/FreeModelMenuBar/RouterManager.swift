@@ -68,6 +68,9 @@ struct RouterLogEntry: Identifiable, Codable, Equatable {
 }
 
 final class RouterManager: ObservableObject {
+    // 日志数组最大保留条数。UI（LogsConsoleView「最近 N 条」文案）和截断逻辑共用同一来源
+    static let maxLogCount: Int = 50
+
     @Published var status: RouterStatus = .off
     @Published var logs: [RouterLogEntry] = []
 
@@ -495,8 +498,8 @@ final class RouterManager: ObservableObject {
     /// 插入一条日志到 logs 顶部，自动截断到最多 50 条
     private func prependingLog(_ entry: RouterLogEntry) {
         logs.insert(entry, at: 0)
-        if logs.count > 50 {
-            logs.removeLast()
+        if logs.count > Self.maxLogCount {
+            logs.removeLast(logs.count - Self.maxLogCount)
         }
     }
 

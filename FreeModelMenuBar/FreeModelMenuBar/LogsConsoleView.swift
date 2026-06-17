@@ -108,7 +108,7 @@ struct LogsConsoleView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("控制台输出 (最近 50 条)")
+                Text("控制台输出 (最近 \(RouterManager.maxLogCount) 条)")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(.secondary)
