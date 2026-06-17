@@ -166,6 +166,7 @@ struct SettingsView: View {
         guard value != nil else { return }
         toastTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
             withAnimation { binding.wrappedValue = nil }
         }
     }
