@@ -436,10 +436,7 @@ final class RouterManager: ObservableObject {
                 if trimmed.hasPrefix("{") && trimmed.hasSuffix("}") {
                     if let data = trimmed.data(using: .utf8),
                        let entry = try? JSONDecoder().decode(RouterLogEntry.self, from: data) {
-                        self.logs.insert(entry, at: 0)
-                        if self.logs.count > 50 {
-                            self.logs.removeLast()
-                        }
+                        self.prependingLog(entry)
                         continue
                     }
                 }
@@ -459,10 +456,7 @@ final class RouterManager: ObservableObject {
                     upstream: "",
                     error: trimmed
                 )
-                self.logs.insert(rawEntry, at: 0)
-                if self.logs.count > 50 {
-                    self.logs.removeLast()
-                }
+                self.prependingLog(rawEntry)
             }
         }
     }
@@ -483,10 +477,15 @@ final class RouterManager: ObservableObject {
                 upstream: "",
                 error: trimmed
             )
-            self.logs.insert(rawEntry, at: 0)
-            if self.logs.count > 50 {
-                self.logs.removeLast()
-            }
+            self.prependingLog(rawEntry)
+        }
+    }
+
+    /// 插入一条日志到 logs 顶部，自动截断到最多 50 条
+    private func prependingLog(_ entry: RouterLogEntry) {
+        logs.insert(entry, at: 0)
+        if logs.count > 50 {
+            logs.removeLast()
         }
     }
 
@@ -503,10 +502,7 @@ final class RouterManager: ObservableObject {
                 upstream: "",
                 error: message
             )
-            self.logs.insert(entry, at: 0)
-            if self.logs.count > 50 {
-                self.logs.removeLast()
-            }
+            self.prependingLog(entry)
         }
     }
 
