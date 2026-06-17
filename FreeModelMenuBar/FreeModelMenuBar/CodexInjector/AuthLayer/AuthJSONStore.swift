@@ -4,6 +4,9 @@ import Foundation
 /// 该文件是 Codex 桌面端（和 CLI）共同读取的认证源。
 /// 我们直接以 Codex 期望的 JSON 结构写入。
 public struct AuthJSONStore {
+    // ISO8601DateFormatter 自 iOS 10 起线程安全，可作为 static let 复用避免每次 decode/encode 都新建。
+    fileprivate static let iso8601Formatter = ISO8601DateFormatter()
+
     public let fileURL: URL
 
     public init(fileURL: URL) {
@@ -58,7 +61,7 @@ enum AuthJSONLooser {
         let email = obj["email"] as? String
         let accountId = obj["account_id"] as? String
         let lastRefreshStr = obj["last_refresh"] as? String
-        let lastRefresh = lastRefreshStr.flatMap { ISO8601DateFormatter().date(from: $0) }
+        let lastRefresh = lastRefreshStr.flatMap { AuthJSONStore.iso8601Formatter.date(from: $0) }
 
         let mode: AuthCredential.Mode
         if apiKey != nil && (access == nil) {
@@ -94,7 +97,7 @@ enum AuthJSONLooser {
             if let v = credential.accountId { obj["account_id"] = v }
         }
         if let d = credential.lastRefresh {
-            obj["last_refresh"] = ISO8601DateFormatter().string(from: d)
+            obj["last_refresh"] = AuthJSONStore.iso8601Formatter.string(from: d)
         }
         return try JSONSerialization.data(
             withJSONObject: obj,
