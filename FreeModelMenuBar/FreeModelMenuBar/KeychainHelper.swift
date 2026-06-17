@@ -12,6 +12,9 @@ final class KeychainHelper {
     static let shared = KeychainHelper()
     private init() {}
 
+    // Keychain 服务标识（3 处 query 字典共用）。集中后改 bundle id 不会漏。
+    private static let service = "com.freemodel.menu bar"
+
     func save(key: String, value: String) {
         // 先删除已有的
         delete(key: key)
@@ -22,7 +25,7 @@ final class KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
             kSecValueData as String: data,
-            kSecAttrService as String: "com.freemodel.menu bar",
+            kSecAttrService as String: Self.service,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
         ]
 
@@ -36,7 +39,7 @@ final class KeychainHelper {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: "com.freemodel.menu bar",
+            kSecAttrService as String: Self.service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -55,7 +58,7 @@ final class KeychainHelper {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: "com.freemodel.menu bar"
+            kSecAttrService as String: Self.service
         ]
 
         SecItemDelete(query as CFDictionary)
