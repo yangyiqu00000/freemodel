@@ -135,6 +135,74 @@ struct RouterSettings: Codable, Equatable {
     }
 }
 
+
+/// 4 个 provider 的全部元数据。新增 / 删除 provider 改这里 1 处即可。
+struct ProviderSpec {
+    let providerID: String
+    let apiBaseURL: String
+    let dashboardURL: String
+    let queryMode: QueryMode
+    let upstreamBaseURL: String      // router 默认上游
+    let defaultModel: String          // router 默认 model
+    let routeModel: String            // router 默认 route model
+    let docURL: String                // 文档链接
+    let displayNamePrefix: String     // 账号默认名 / 显示名
+
+    static let all: [String: ProviderSpec] = [
+        "freemodel": ProviderSpec(
+            providerID: "freemodel",
+            apiBaseURL: "https://api.freemodel.dev",
+            dashboardURL: "https://freemodel.dev",
+            queryMode: .dashboard,
+            upstreamBaseURL: "https://api.freemodel.dev/v1",
+            defaultModel: "codex-mini",
+            routeModel: "codex-mini",
+            docURL: "https://freemodel.dev/docs",
+            displayNamePrefix: "FreeModel"
+        ),
+        "deepseek": ProviderSpec(
+            providerID: "deepseek",
+            apiBaseURL: "https://api.deepseek.com",
+            dashboardURL: "https://platform.deepseek.com",
+            queryMode: .apiKey,
+            upstreamBaseURL: "https://api.deepseek.com/v1",
+            defaultModel: "deepseek-chat",
+            routeModel: "codex-mini",
+            docURL: "https://api-docs.deepseek.com",
+            displayNamePrefix: "DeepSeek"
+        ),
+        "openrouter": ProviderSpec(
+            providerID: "openrouter",
+            apiBaseURL: "https://openrouter.ai/api/v1",
+            dashboardURL: "https://openrouter.ai",
+            queryMode: .apiKey,
+            upstreamBaseURL: "https://openrouter.ai/api/v1",
+            defaultModel: "deepseek/deepseek-v4-flash:free",
+            routeModel: "codex-mini",
+            docURL: "https://openrouter.ai/docs",
+            displayNamePrefix: "OpenRouter"
+        ),
+        "modelscope": ProviderSpec(
+            providerID: "modelscope",
+            apiBaseURL: "https://api-inference.modelscope.cn",
+            dashboardURL: "https://modelscope.cn",
+            queryMode: .apiKey,
+            upstreamBaseURL: "https://api-inference.modelscope.cn/v1",
+            defaultModel: "ZhipuAI/GLM-5.1",
+            routeModel: "codex-mini",
+            docURL: "https://modelscope.cn/docs/model-service/API-Inference/api-provider",
+            displayNamePrefix: "ModelScope"
+        ),
+    ]
+
+    /// 不区分大小写查表；找不到返回 freemodel 默认
+    static func preset(for id: String) -> ProviderSpec {
+        all[id.lowercased()] ?? all["freemodel"]!
+    }
+}
+
+
+
 struct ProviderAccount: Codable, Equatable, Identifiable {
     let id: UUID
     var providerID: String
@@ -237,26 +305,15 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
         let upstreamURL: String
         let model: String
 
-        switch providerID.lowercased() {
-        case "deepseek":
-            upstreamURL = "https://api.deepseek.com/v1"
-            model = "deepseek-chat"
-        case "openrouter":
-            upstreamURL = "https://openrouter.ai/api/v1"
-            model = "deepseek/deepseek-v4-flash:free"
-        case "modelscope":
-            upstreamURL = "https://api-inference.modelscope.cn/v1"
-            model = "ZhipuAI/GLM-5.1"
-        default:
-            upstreamURL = "https://api.freemodel.dev/v1"
-            model = "codex-mini"
-        }
+        let preset = ProviderSpec.preset(for: providerID)
+        upstreamURL = preset.upstreamBaseURL
+        model = preset.defaultModel
 
         return routerSettings ?? RouterSettings(
             enabled: false,
             port: 38440,
             upstreamBaseURL: upstreamURL,
-            routeModel: "codex-mini",
+            routeModel: preset.routeModel,
             defaultModel: model,
             supportsStreaming: true,
             failoverEnabled: true
@@ -279,21 +336,15 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
     }
 
     var displayProviderName: String {
-        switch providerID.lowercased() {
-        case "deepseek": return "DeepSeek"
-        case "openrouter": return "OpenRouter"
-        case "modelscope": return "ModelScope"
-        default: return "FreeModel"
-        }
+        return ProviderSpec.preset(for: providerID).displayNamePrefix
     }
 
     var docURLString: String {
-        switch providerID.lowercased() {
-        case "deepseek": return "https://api-docs.deepseek.com"
-        case "openrouter": return "https://openrouter.ai/docs"
-        case "modelscope": return "https://modelscope.cn/docs/model-service/API-Inference/api-provider"
-        default: return "\(dashboardURL)/docs"
+        let preset = ProviderSpec.preset(for: providerID)
+        if preset.providerID == "freemodel" {
+            return "\(dashboardURL)/docs"
         }
+        return preset.docURL
     }
 }
 
@@ -385,24 +436,10 @@ final class AccountManager: ObservableObject {
         let dashURL: String
         let mode: QueryMode
 
-        switch providerID.lowercased() {
-        case "deepseek":
-            apiURL = "https://api.deepseek.com"
-            dashURL = "https://platform.deepseek.com"
-            mode = .apiKey
-        case "openrouter":
-            apiURL = "https://openrouter.ai/api/v1"
-            dashURL = "https://openrouter.ai"
-            mode = .apiKey
-        case "modelscope":
-            apiURL = "https://api-inference.modelscope.cn"
-            dashURL = "https://modelscope.cn"
-            mode = .apiKey
-        default:
-            apiURL = "https://api.freemodel.dev"
-            dashURL = "https://freemodel.dev"
-            mode = .dashboard
-        }
+        let preset = ProviderSpec.preset(for: providerID)
+        apiURL = preset.apiBaseURL
+        dashURL = preset.dashboardURL
+        mode = preset.queryMode
 
         let account = ProviderAccount(
             providerID: providerID,
@@ -536,13 +573,7 @@ final class AccountManager: ObservableObject {
     }
 
     private func nextDefaultAccountName(providerID: String = "freemodel") -> String {
-        let prefix: String
-        switch providerID.lowercased() {
-        case "deepseek": prefix = "DeepSeek"
-        case "openrouter": prefix = "OpenRouter"
-        case "modelscope": prefix = "ModelScope"
-        default: prefix = "FreeModel"
-        }
+        let prefix = ProviderSpec.preset(for: providerID).displayNamePrefix
         let existingCount = accounts.filter { $0.providerID == providerID }.count
         return "\(prefix) \(existingCount + 1)"
     }
