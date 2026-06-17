@@ -30,8 +30,11 @@ struct FreeModelDashboardBalanceParser {
         let used: Double?
     }
 
+    // 复用的 JSONDecoder（thread-safe，自 iOS 7+/macOS 10.9+）
+    private static let decoder = JSONDecoder()
+
     static func parse(usageData: Data, billingData: Data, referralData: Data?) throws -> BalanceInfo {
-        let decoder = JSONDecoder()
+        let decoder = Self.decoder
         let usage = try decoder.decode(UsageResponse.self, from: usageData)
         let billing = try decoder.decode(BillingResponse.self, from: billingData)
         let referral = try referralData.map { try decoder.decode(ReferralResponse.self, from: $0) }
