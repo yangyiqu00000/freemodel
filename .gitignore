@@ -37,3 +37,8 @@ yarn-error.log*
 *.log
 .env
 .env.local
+
+# Codex 桌面会话临时文件
+HANDOFF_NEXT.md
+HANDOFF_*.md
+FreeModelMenuBar/build_manual/
