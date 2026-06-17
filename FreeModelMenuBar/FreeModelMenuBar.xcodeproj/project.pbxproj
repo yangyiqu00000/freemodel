@@ -83,6 +83,7 @@
 				<string>fileRouterSettingsView</string>
 				<string>fileLogsConsoleView</string>
 				<string>fileSettingsSidebarView</string>
+				<string>fileAccountSettingsView</string>
 				<string>fileRouterSidecar</string>
 				<string>fileAssets</string>
 			</array>
@@ -317,6 +318,7 @@
 				<string>buildFileRouterSettingsView</string>
 				<string>buildFileLogsConsoleView</string>
 				<string>buildFileSettingsSidebarView</string>
+				<string>buildFileAccountSettingsView</string>
 			</array>
 			<key>runOnlyForDeploymentPostprocessing</key>
 			<string>0</string>
@@ -1287,6 +1289,29 @@
 			<string>PBXBuildFile</string>
 			<key>fileRef</key>
 			<string>fileSettingsSidebarView</string>
+		</dict>
+
+		<key>fileAccountSettingsView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>fileEncoding</key>
+			<string>4</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>name</key>
+			<string>AccountSettingsView.swift</string>
+			<key>path</key>
+			<string>AccountSettingsView.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>buildFileAccountSettingsView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+			<key>fileRef</key>
+			<string>fileAccountSettingsView</string>
 		</dict>
 
 		<!-- Product Reference -->
