@@ -329,7 +329,10 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
     }
 
     var cookieHeader: String {
-        validCookies
+        // validCookies 是 computed property，直接连用会走两次 filter。
+        // 局部缓存让一次过滤结果被 sort/map/join 复用。
+        let valid = validCookies
+        return valid
             .sorted { $0.name < $1.name }
             .map(\.headerPair)
             .joined(separator: "; ")
