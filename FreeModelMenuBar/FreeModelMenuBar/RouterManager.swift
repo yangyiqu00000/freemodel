@@ -82,6 +82,15 @@ final class RouterManager: ObservableObject {
     private var outputBuffer = ""
     private var isStopping = false
 
+    // locateNode 结果缓存：进程内 node 路径不会变，只查一次。
+    // 三态 enum 避免 Optional 无法区分「未查」与「查到 nil」。
+    private enum NodePathState {
+        case notSearched
+        case found(String)
+        case notFound
+    }
+    private var cachedNodePath: NodePathState = .notSearched
+
     init(accountManager: AccountManager) {
         self.accountManager = accountManager
 
@@ -193,6 +202,20 @@ final class RouterManager: ObservableObject {
     }
 
     private func locateNode() -> String? {
+        if case .found(let cached) = cachedNodePath { return cached }
+        if case .notFound = cachedNodePath { return nil }
+
+        let result = performNodeLookup()
+
+        if let path = result {
+            cachedNodePath = .found(path)
+        } else {
+            cachedNodePath = .notFound
+        }
+        return result
+    }
+
+    private func performNodeLookup() -> String? {
         // 1. Check typical absolute paths
         let commonPaths = [
             "/opt/homebrew/bin/node",
