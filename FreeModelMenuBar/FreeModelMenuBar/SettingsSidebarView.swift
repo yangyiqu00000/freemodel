@@ -254,16 +254,14 @@ struct SettingsSidebarView: View {
     }
 
     private func commitAccountCreation(label: String, providerID: String, providerDisplayName: String) {
-        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalLabel = trimmed.isEmpty ? "新账号 \(shortNow())" : trimmed
+        let finalLabel = Self.trimmedOrFallback(label, fallback: "新账号 \(shortNow())")
         let account = accountManager.createAccount(displayName: finalLabel, providerID: providerID)
         selectAccountAndSync(id: account.id)
         showToast("已添加：\(account.displayName) · \(providerDisplayName)", at: $accountToast)
     }
 
     private func commitCodexOfficialCreation(label: String) {
-        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalLabel = trimmed.isEmpty ? "新配置 \(shortNow())" : trimmed
+        let finalLabel = Self.trimmedOrFallback(label, fallback: "新配置 \(shortNow())")
         codexInjectionLayer.prepareOfficialLoginSession(label: finalLabel)
         if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
             selectedItem = .codexInjectionConfig(newID)
@@ -272,10 +270,8 @@ struct SettingsSidebarView: View {
     }
 
     private func commitCodexThirdPartyCreation(label: String, providerID: String) {
-        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedProvider = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalLabel = trimmedLabel.isEmpty ? "新配置 \(shortNow())" : trimmedLabel
-        let finalProvider = trimmedProvider.isEmpty ? "custom-\(shortNow())" : trimmedProvider
+        let finalLabel = Self.trimmedOrFallback(label, fallback: "新配置 \(shortNow())")
+        let finalProvider = Self.trimmedOrFallback(providerID, fallback: "custom-\(shortNow())")
         codexInjectionLayer.addEmptyThirdPartyConfiguration(label: finalLabel, providerID: finalProvider)
         if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
             selectedItem = .codexInjectionConfig(newID)
@@ -313,6 +309,12 @@ struct SettingsSidebarView: View {
 
     private static func shortNow() -> String {
         Self.shortNowFormatter.string(from: Date())
+    }
+
+    // 修剪首尾空白，若结果为空则使用 fallback（添加账号/Codex 配置时的统一处理）
+    private static func trimmedOrFallback(_ text: String, fallback: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private func shortNow() -> String { Self.shortNow() }
