@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    private static let windowSize = CGSize(width: 720, height: 620)
 
 private enum AddKind { case account, codex }
     @EnvironmentObject var accountManager: AccountManager
@@ -137,7 +138,7 @@ private enum AddKind { case account, codex }
         }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(width: 720, height: 620)
+        .frame(width: Self.windowSize.width, height: Self.windowSize.height)
         .onAppear {
             if let activeID = accountManager.activeAccountID {
                 selectedItem = .account(activeID)
@@ -265,7 +266,7 @@ private enum AddKind { case account, codex }
     }
 
     private var logsSection: some View {
-        Section(header: sidebarSectionHeader(title: "运行日志", systemImage: "terminal.fill", trailing: nil)) {
+        Section(header: sidebarSectionHeader(title: "运行日志", systemImage: "terminal.fill")) {
             SidebarRow(
                 icon: "terminal.fill",
                 iconColor: routerManager.status.statusColor ?? .secondary,
@@ -357,16 +358,14 @@ private enum AddKind { case account, codex }
     // MARK: - 账号 section 标题（与 Codex 注入同形状：label + 右侧 +）
 
     private var accountsSectionHeader: some View {
-        sidebarSectionHeader(
-            title: "账号",
-            systemImage: "person.2.fill",
-            trailing: addExpandedToggleButton(
+        sidebarSectionHeader(title: "账号", systemImage: "person.2.fill") {
+            addExpandedToggleButton(
                 kind: .account,
                 onExpand: { newAccountLabel = "新账号 \(Self.shortNow())" },
                 helpExpand: "新增账号",
                 helpCollapse: "收起添加账号行"
             )
-        )
+        }
     }
     // MARK: - 内联账号添加行（与 codexInlineAddRow 同形状）
 
@@ -422,10 +421,8 @@ private enum AddKind { case account, codex }
     }
 
     private var codexSectionHeader: some View {
-        sidebarSectionHeader(
-            title: "Codex 注入",
-            systemImage: "key.horizontal.fill",
-            trailing: addExpandedToggleButton(
+        sidebarSectionHeader(title: "Codex 注入", systemImage: "key.horizontal.fill") {
+            addExpandedToggleButton(
                 kind: .codex,
                 onExpand: {
                     newCodexLabel = "新配置 \(Self.shortNow())"
@@ -434,7 +431,7 @@ private enum AddKind { case account, codex }
                 helpExpand: "添加一条新的注入配置",
                 helpCollapse: "收起添加注入配置行"
             )
-        )
+        }
     }
     // MARK: - 内联添加行（替代 sheet）
 
@@ -713,8 +710,7 @@ private enum AddKind { case account, codex }
                 }
             }
 	            HStack(spacing: 8) {
-	                let platformName = providerName(account)
-	                tag("平台: \(platformName)", systemImage: "server.rack")
+	                tag("平台: \(account.displayProviderName)", systemImage: "server.rack")
 	                tag(account.hasDashboardSession ? "控制台已登录" : "控制台未登录", systemImage: account.hasDashboardSession ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
 	                if account.hasAPIKey {
                     tag("已保存 API Key", systemImage: "key.fill")
@@ -886,36 +882,18 @@ private enum AddKind { case account, codex }
     }
 
     private func linksSection(_ account: ProviderAccount) -> some View {
-        let providerName: String
-        let docURLString: String
-        
-        switch account.providerID.lowercased() {
-        case "deepseek":
-            providerName = "DeepSeek"
-            docURLString = "https://api-docs.deepseek.com"
-        case "openrouter":
-            providerName = "OpenRouter"
-            docURLString = "https://openrouter.ai/docs"
-        case "modelscope":
-            providerName = "ModelScope"
-            docURLString = "https://modelscope.cn/docs/model-service/API-Inference/api-provider"
-        default:
-            providerName = "FreeModel"
-            docURLString = "\(account.dashboardURL)/docs"
-        }
-
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             Label("快捷链接", systemImage: "link")
                 .font(.headline)
 
             HStack(spacing: 12) {
-                Button("打开 \(providerName) 控制面板") {
+                Button("打开 \(account.displayProviderName) 控制面板") {
                     openURL(account.dashboardURL)
                 }
                 .buttonStyle(.bordered)
 
                 Button("API 文档") {
-                    openURL(docURLString)
+                    openURL(account.docURLString)
                 }
                 .buttonStyle(.bordered)
             }
@@ -1023,55 +1001,6 @@ private enum AddKind { case account, codex }
 	            .background(Capsule().fill(Color.overlayFill))
 	    }
 
-	    private func providerName(_ account: ProviderAccount) -> String {
-	        if account.providerID == "deepseek" || account.apiBaseURL.lowercased().contains("deepseek") {
-	            return "DeepSeek"
-	        }
-	        return "FreeModel"
-	    }
-
-
-    // MARK: - 统一 provider 预设入口（1 次点击设齐 6 个字段）
-
-    private func logRowView(_ log: RouterLogEntry) -> some View {
-        let color: Color
-        if log.method == "SYS" || log.method == "INFO" {
-            color = .blue
-        } else if log.method == "ERROR" {
-            color = .red
-        } else {
-            color = log.status >= 400 ? .orange : .green
-        }
-
-
-        return HStack(alignment: .top, spacing: 6) {
-            Text("[\(log.time)]")
-                .foregroundStyle(.gray)
-            
-            Text(log.method)
-                .fontWeight(.bold)
-                .foregroundStyle(color)
-                .frame(width: 45, alignment: .leading)
-
-            if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
-                Text(log.error ?? "")
-                    .foregroundStyle(.white)
-            } else {
-                Text("\(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)")
-                    .foregroundStyle(.white)
-                if let error = log.error {
-                    Text("- Err: \(error)")
-                        .foregroundStyle(.orange)
-                }
-            }
-        }
-        .font(.system(size: 10, weight: .regular, design: .monospaced))
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Logs Console View
-    // 已提取至 LogsConsoleView.swift
-
     // MARK: - Toast 自动隐藏（Task 取消模式防过期复活）
 
     private func showToast<T: Equatable>(_ value: T?, at binding: Binding<T?>, seconds: Double = 3.0) {
@@ -1093,39 +1022,36 @@ private enum AddKind { case account, codex }
     }
 
     /// 侧边栏 +号折叠 toggle 按钮（账号 / Codex 注入 2 处共用）
-    /// - kind: 要切换的 AddKind
-    /// - onExpand: 用户点 + 触发后回调（用于预填默认 label / provider）
-    /// - helpExpand / helpCollapse: 折叠/展开态的 help 文字
     private func addExpandedToggleButton(
         kind: AddKind,
         onExpand: @escaping () -> Void,
         helpExpand: String,
         helpCollapse: String
-    ) -> AnyView {
-        AnyView(
-            Button {
-                addExpanded = (addExpanded == kind) ? nil : kind
-                if addExpanded == kind {
-                    onExpand()
-                }
-            } label: {
-                Image(systemName: addExpanded == kind ? "minus" : "plus")
+    ) -> some View {
+        Button {
+            addExpanded = (addExpanded == kind) ? nil : kind
+            if addExpanded == kind {
+                onExpand()
             }
-            .buttonStyle(.borderless)
-            .help(addExpanded == kind ? helpCollapse : helpExpand)
-        )
+        } label: {
+            Image(systemName: addExpanded == kind ? "minus" : "plus")
+        }
+        .buttonStyle(.borderless)
+        .help(addExpanded == kind ? helpCollapse : helpExpand)
     }
 
     /// 侧边栏 section header（Label + headline + trailing 可选 + button），3 处共用
-    private func sidebarSectionHeader(title: String, systemImage: String, trailing: AnyView?) -> some View {
+    private func sidebarSectionHeader<Trailing: View>(title: String, systemImage: String, @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack {
             Label(title, systemImage: systemImage)
                 .font(.headline)
             Spacer()
-            if let trailing = trailing {
-                trailing
-            }
+            trailing()
         }
+    }
+
+    private func sidebarSectionHeader(title: String, systemImage: String) -> some View {
+        sidebarSectionHeader(title: title, systemImage: systemImage) { EmptyView() }
     }
 
     private func sectionHeader(_ title: String, systemImage: String, statusColor: Color? = nil) -> some View {

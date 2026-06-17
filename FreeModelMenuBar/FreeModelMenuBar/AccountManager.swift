@@ -277,6 +277,24 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
             .map(\.headerPair)
             .joined(separator: "; ")
     }
+
+    var displayProviderName: String {
+        switch providerID.lowercased() {
+        case "deepseek": return "DeepSeek"
+        case "openrouter": return "OpenRouter"
+        case "modelscope": return "ModelScope"
+        default: return "FreeModel"
+        }
+    }
+
+    var docURLString: String {
+        switch providerID.lowercased() {
+        case "deepseek": return "https://api-docs.deepseek.com"
+        case "openrouter": return "https://openrouter.ai/docs"
+        case "modelscope": return "https://modelscope.cn/docs/model-service/API-Inference/api-provider"
+        default: return "\(dashboardURL)/docs"
+        }
+    }
 }
 
 struct AccountState: Codable, Equatable {
