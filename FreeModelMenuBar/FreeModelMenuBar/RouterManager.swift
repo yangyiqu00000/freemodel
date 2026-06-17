@@ -490,7 +490,10 @@ final class RouterManager: ObservableObject {
     }
 
     private func appendLog(_ message: String) {
-        DispatchQueue.main.async { [weak self] in
+        // 日志在 SwiftUI 的 @Published 数组上更新，需要在主线程操作。
+        // 主线程直接写入以避免一次额外的 runloop 延迟（启动期连续日志尤为明显），
+        // 后台线程（如 Pipe 读取回调）才走 dispatch。
+        let write = { [weak self] in
             guard let self = self else { return }
             let entry = RouterLogEntry(
                 time: Date().formatted(date: .omitted, time: .standard),
@@ -503,6 +506,11 @@ final class RouterManager: ObservableObject {
                 error: message
             )
             self.prependingLog(entry)
+        }
+        if Thread.isMainThread {
+            write()
+        } else {
+            DispatchQueue.main.async(execute: write)
         }
     }
 
