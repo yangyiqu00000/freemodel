@@ -80,6 +80,7 @@
 				<string>fileSemanticColors</string>
 				<string>fileStatusBadge</string>
 				<string>fileViewExtensions</string>
+				<string>fileRouterSettingsView</string>
 				<string>fileRouterSidecar</string>
 				<string>fileAssets</string>
 			</array>
@@ -311,6 +312,7 @@
 				<string>buildFileSemanticColors</string>
 				<string>buildFileStatusBadge</string>
 				<string>buildFileViewExtensions</string>
+				<string>buildFileRouterSettingsView</string>
 			</array>
 			<key>runOnlyForDeploymentPostprocessing</key>
 			<string>0</string>
@@ -1212,6 +1214,29 @@
 			<string>PBXBuildFile</string>
 			<key>fileRef</key>
 			<string>fileViewExtensions</string>
+		</dict>
+
+		<key>fileRouterSettingsView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>fileEncoding</key>
+			<string>4</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>name</key>
+			<string>RouterSettingsView.swift</string>
+			<key>path</key>
+			<string>RouterSettingsView.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>buildFileRouterSettingsView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+			<key>fileRef</key>
+			<string>fileRouterSettingsView</string>
 		</dict>
 
 		<!-- Product Reference -->

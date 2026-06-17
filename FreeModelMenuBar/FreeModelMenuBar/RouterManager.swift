@@ -9,6 +9,7 @@ import Combine
 import Foundation
 import Network
 import AppKit
+import SwiftUI
 
 enum RouterStatus: String, Codable, CaseIterable {
     case off = "已关闭"
@@ -17,6 +18,26 @@ enum RouterStatus: String, Codable, CaseIterable {
     case failed = "启动失败"
     case portInUse = "端口占用"
     case missingKey = "未配置 Key"
+
+    var subtitle: String {
+        switch self {
+        case .off: return "路由未启动"
+        case .starting: return "路由启动中…"
+        case .running: return "路由运行中"
+        case .failed: return "路由启动失败"
+        case .portInUse: return "端口占用"
+        case .missingKey: return "请先配置 API Key"
+        }
+    }
+
+    var statusColor: Color? {
+        switch self {
+        case .running: return .green
+        case .starting: return .orange
+        case .failed, .portInUse, .missingKey: return .red
+        case .off: return nil
+        }
+    }
 }
 
 struct RouterLogEntry: Identifiable, Codable, Equatable {

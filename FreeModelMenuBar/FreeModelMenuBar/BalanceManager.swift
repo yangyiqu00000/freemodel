@@ -283,62 +283,6 @@ class BalanceManager: ObservableObject {
         }
     }
 
-    /// 兼容旧版本的猜测式 API Key 余额端点，保留为兜底解析能力。
-    func fetchLegacyAPIKeyBalance() async {
-        guard let account = accountManager.activeAccount else {
-            errorMessage = "请先在设置中添加账号"
-            return
-        }
-        guard let apiKey = apiKey, !apiKey.isEmpty else {
-            errorMessage = "请先在设置中配置 API Key"
-            return
-        }
-
-        let endpoints = [
-            "/user/balance",
-            "/v1/dashboard/billing/subscription",
-            "/v1/dashboard/billing/credit_grants",
-            "/v1/user/balance",
-            "/v1/balance",
-            "/dashboard/billing/subscription",
-            "/dashboard/billing/credit_grants"
-        ]
-
-        var lastError: FreeModelError?
-
-        for endpoint in endpoints {
-            do {
-                let result = try await queryEndpoint(endpoint, apiKey: apiKey, apiBaseURL: account.apiBaseURL)
-                accountManager.updateBalance(result, for: account.id)
-                self.balanceInfo = result
-                self.lastRefreshDate = result.lastUpdated
-                self.isLoading = false
-                return
-            } catch let error as FreeModelError {
-                lastError = error
-                // 如果是 401/403，API Key 无效，不需要尝试其他端点
-                if case .invalidAPIKey = error {
-                    break
-                }
-                continue
-            } catch {
-                lastError = .networkError(error)
-                continue
-            }
-        }
-
-        // 所有端点都失败，尝试使用 models 端点来验证 API Key 是否有效
-        do {
-            _ = try await queryModelsEndpoint(apiKey: apiKey, apiBaseURL: account.apiBaseURL)
-            // API Key 有效但余额端点不可用，使用模拟数据提示用户
-            self.errorMessage = "API Key 有效，但 FreeModel 未开放 API Key 余额查询接口。请使用控制台网页登录态获取余额。"
-        } catch {
-            self.errorMessage = lastError?.errorDescription ?? "无法连接到 FreeModel API"
-        }
-
-        self.isLoading = false
-    }
-
     /// 查询单个端点
     private func queryEndpoint(_ endpoint: String, apiKey: String, apiBaseURL: String) async throws -> BalanceInfo {
         guard let url = makeEndpointURL(apiBaseURL: apiBaseURL, endpoint: endpoint) else {

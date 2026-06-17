@@ -38,6 +38,29 @@ extension View {
             return AnyView(dot)
         }
     }
+
+    /// 详情区段背景（gray 8pt 圆角 panel）——8 处统一使用
+    func sectionPanel() -> some View {
+        self
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
+    }
+
+    /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
+    func sectionVStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 16, content: content)
+    }
+
+    /// 侧边栏内联添加行背景（blue 6pt 圆角小卡片）——2 处统一使用（账号 + Codex 注入）
+    func addRowPanel() -> some View {
+        self
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.blue.opacity(0.08))
+            )
+    }
 }
 
 extension Binding where Value == Bool {

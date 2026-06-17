@@ -24,7 +24,6 @@ private enum AddKind { case account, codex }
     @State private var selectedItem: SidebarItem? = nil
     @State private var apiKeyInput: String = ""
     @State private var showAPIKey: Bool = false
-    @State private var selectedRefreshInterval: TimeInterval = 300
     @State private var isTesting: Bool = false
 
     // API Key 状态机（6 种状态，原 3 个 bool 收敛为 1 个枚举）
@@ -38,70 +37,8 @@ private enum AddKind { case account, codex }
     }
     @State private var apiKeyStatus: ApiKeyStatus = .empty
 
-    // Provider 预设（4 个，统一入口，1 次点击设齐 URL+QueryMode+Router+RouteModel+Streaming+Failover）
-    private enum ProviderPreset: String, CaseIterable, Identifiable {
-        case freeModel = "FreeModel"
-        case deepseek = "DeepSeek"
-        case openRouter = "OpenRouter"
-        case modelScope = "ModelScope"
-        var id: String { rawValue }
-
-        struct Config {
-            let apiURL: String
-            let dashboardURL: String
-            let queryMode: QueryMode
-            let routerUpstream: String
-            let defaultModel: String
-            let routeModel: String
-        }
-
-        var config: Config {
-            switch self {
-            case .freeModel:
-                return .init(apiURL: "https://api.freemodel.dev",
-                             dashboardURL: "https://freemodel.dev",
-                             queryMode: .dashboard,
-                             routerUpstream: "https://api.freemodel.dev/v1",
-                             defaultModel: "codex-mini",
-                             routeModel: "codex-mini")
-            case .deepseek:
-                return .init(apiURL: "https://api.deepseek.com",
-                             dashboardURL: "https://platform.deepseek.com",
-                             queryMode: .apiKey,
-                             routerUpstream: "https://api.deepseek.com/v1",
-                             defaultModel: "deepseek-chat",
-                             routeModel: "codex-mini")
-            case .openRouter:
-                return .init(apiURL: "https://openrouter.ai/api/v1",
-                             dashboardURL: "https://openrouter.ai",
-                             queryMode: .apiKey,
-                             routerUpstream: "https://openrouter.ai/api/v1",
-                             defaultModel: "deepseek/deepseek-v4-flash:free",
-                             routeModel: "codex-mini")
-            case .modelScope:
-                return .init(apiURL: "https://api-inference.modelscope.cn",
-                             dashboardURL: "https://modelscope.cn",
-                             queryMode: .apiKey,
-                             routerUpstream: "https://api-inference.modelscope.cn/v1",
-                             defaultModel: "ZhipuAI/GLM-5.1",
-                             routeModel: "codex-mini")
-            }
-        }
-    }
-
-    // 自定义 URL / 预设切换反馈（原本借用 apiKeySection 的 showTestResult，跨区段渲染看不到）
-    private struct UrlPresetStatus: Equatable {
-        let success: Bool
-        let message: String
-    }
-    @State private var urlPresetStatus: UrlPresetStatus? = nil
-    @State private var urlPresetStatusToken: Int = 0
     @State private var renameText: String = ""
     @State private var initialDisplayName: String = ""
-    @State private var initialApiURL: String = ""
-    @State private var initialDashboardURL: String = ""
-    @State private var apiURLInput: String = ""
-    @State private var dashboardURLInput: String = ""
 
     // 账号 sidebar state
     @State private var addExpanded: AddKind? = nil
@@ -120,44 +57,15 @@ private enum AddKind { case account, codex }
     // 日志清除 toast
     @State private var logsClearedToast: String? = nil
     @State private var pendingScrollToAPIKey: Bool = false
-    @State private var logsClearedToastToken: Int = 0
     // 复制 Base URL toast
     @State private var baseURLCopiedToast: String? = nil
-    @State private var baseURLCopiedToastToken: Int = 0
     // 添加账号 toast（账号 4 chip 共用）
     @State private var accountCreatedToast: String? = nil
-    @State private var accountCreatedToastToken: Int = 0
     // 添加 Codex 注入 toast（官方 / 第三方 共用）
     @State private var codexConfigCreatedToast: String? = nil
-    @State private var codexConfigCreatedToastToken: Int = 0
+    @State private var toastTask: Task<Void, Never>?
 
-    // Router State
-    @State private var initialRouterEnabled: Bool = false
-    @State private var initialRouterPort: String = "38440"
-    @State private var initialRouterUpstreamURL: String = ""
-    @State private var initialRouterRouteModel: String = ""
-    @State private var initialRouterDefaultModel: String = ""
-    @State private var initialRouterStreaming: Bool = true
-    @State private var initialRouterFailoverEnabled: Bool = true
-    @State private var initialRouterMaxConcurrency: String = "0"
-    @State private var initialRouterMinIntervalMs: String = "0"
-    @State private var routerEnabled: Bool = false
-    @State private var routerPort: String = "38440"
-    @State private var routerUpstreamURL: String = ""
-    @State private var routerRouteModel: String = ""
-    @State private var routerDefaultModel: String = ""
-    @State private var routerStreaming: Bool = true
-    @State private var routerFailoverEnabled: Bool = true
-    @State private var routerMaxConcurrency: String = "0"
-    @State private var routerMinIntervalMs: String = "0"
-
-    private let refreshOptions: [(String, TimeInterval)] = [
-        ("1 分钟", 60),
-        ("5 分钟", 300),
-        ("10 分钟", 600),
-        ("30 分钟", 1800),
-        ("1 小时", 3600)
-    ]
+    // Router State（已移至 RouterSettingsView 的 RouterEditingState）
 
     var body: some View {
         HStack(spacing: 0) {
@@ -196,12 +104,13 @@ private enum AddKind { case account, codex }
 
                                 sectionDivider()
 
-                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerHeaderStatusColor())
-                                sectionVStack {
-                                    routerSection(account)
-                                    customURLsSection(account)
-                                    refreshSection
-                                }
+                                sectionHeader("路由", systemImage: "arrow.triangle.2.circlepath.circle", statusColor: routerManager.status.statusColor)
+                                RouterSettingsView(
+                                    account: account,
+                                    accountManager: accountManager,
+                                    routerManager: routerManager,
+                                    pendingScrollToAPIKey: $pendingScrollToAPIKey
+                                )
                             } else {
                                 emptyStateView(.accountGone)
                             }
@@ -253,7 +162,6 @@ private enum AddKind { case account, codex }
                 }
             }
             apiKeyStatus = .unsaved
-            urlPresetStatus = nil
             balanceManager.syncFromActiveAccount()
             loadFieldsFromActiveAccount()
         }
@@ -362,10 +270,10 @@ private enum AddKind { case account, codex }
         Section(header: sidebarSectionHeader(title: "运行日志", systemImage: "terminal.fill", trailing: nil)) {
             SidebarRow(
                 icon: "terminal.fill",
-                iconColor: routerStatusColor(routerManager.status) ?? .secondary,
+                iconColor: routerManager.status.statusColor ?? .secondary,
                 title: "运行日志",
-                subtitle: routerStatusSubtitle,
-                statusColor: routerStatusColor(routerManager.status),
+                subtitle: routerManager.status.subtitle,
+                statusColor: routerManager.status.statusColor,
                 isSelected: {
                     if case .logs = selectedItem { return true }
                     return false
@@ -556,7 +464,7 @@ private enum AddKind { case account, codex }
                         if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
                             selectedItem = .codexInjectionConfig(newID)
                         }
-                        addSuccessToast(value: $codexConfigCreatedToast, token: $codexConfigCreatedToastToken, message: "已添加：\(newCodexLabel) · 官方")
+                        showToast("已添加：\(newCodexLabel) · 官方", at: $codexConfigCreatedToast)
                     } label: {
                         Label("官方", systemImage: "person.crop.circle.badge.checkmark")
                             .frame(maxWidth: .infinity)
@@ -567,7 +475,7 @@ private enum AddKind { case account, codex }
                         if let newID = codexInjectionLayer.injectionConfigurations.last?.id {
                             selectedItem = .codexInjectionConfig(newID)
                         }
-                        addSuccessToast(value: $codexConfigCreatedToast, token: $codexConfigCreatedToastToken, message: "已添加：\(newCodexLabel) · 第三方")
+                        showToast("已添加：\(newCodexLabel) · 第三方", at: $codexConfigCreatedToast)
                     } label: {
                         Label("第三方", systemImage: "square.and.pencil")
                             .frame(maxWidth: .infinity)
@@ -682,45 +590,14 @@ private enum AddKind { case account, codex }
 	    private func loadFieldsFromActiveAccount() {
 	        guard let account = accountManager.activeAccount else {
 	            renameText = ""
-	            apiURLInput = ""
-	            dashboardURLInput = ""
 	            apiKeyInput = ""
-	            selectedRefreshInterval = 300
 	            return
 	        }
 
-	        selectedRefreshInterval = account.refreshInterval
 	        renameText = account.displayName
 	        initialDisplayName = account.displayName
-	        apiURLInput = account.apiBaseURL
-	        dashboardURLInput = account.dashboardURL
-	        initialApiURL = account.apiBaseURL
-	        initialDashboardURL = account.dashboardURL
 	        apiKeyInput = account.apiKey ?? ""
-
-	        let s = account.activeRouterSettings
-        routerEnabled = s.enabled
-        initialRouterEnabled = s.enabled
-        routerPort = String(s.port)
-        initialRouterPort = String(s.port)
-        routerUpstreamURL = s.upstreamBaseURL
-        initialRouterUpstreamURL = s.upstreamBaseURL
-        routerRouteModel = s.routeModel
-        initialRouterRouteModel = s.routeModel
-        routerDefaultModel = s.defaultModel
-        initialRouterDefaultModel = s.defaultModel
-        routerStreaming = s.supportsStreaming
-        initialRouterStreaming = s.supportsStreaming
-        routerFailoverEnabled = s.isFailoverEnabled
-        initialRouterFailoverEnabled = s.isFailoverEnabled
-        routerMaxConcurrency = String(s.maxConcurrency ?? 0)
-        initialRouterMaxConcurrency = String(s.maxConcurrency ?? 0)
-        routerMinIntervalMs = String(s.minIntervalMs ?? 0)
-        initialRouterMinIntervalMs = String(s.minIntervalMs ?? 0)
-
-        // 切到不同账号时，重置 API Key / URL 预设状态（避免上一个账号的提示泄漏）
-        apiKeyStatus = .unsaved
-        urlPresetStatus = nil
+	        apiKeyStatus = .unsaved
 	    }
 
     private func accountRow(_ account: ProviderAccount) -> some View {
@@ -746,7 +623,7 @@ private enum AddKind { case account, codex }
             tint: .blue,
             title: "FreeModel 设置",
             subtitle: headerSubtitle,
-            dotColor: headerStatusDot
+            dotColor: routerManager.status.statusColor
         )
     }
 
@@ -766,10 +643,6 @@ private enum AddKind { case account, codex }
             codexPart = "\(codexCount) 条注入"
         }
         return "\(accountPart) · \(codexPart)"
-    }
-
-    private var headerStatusDot: Color? {
-        routerStatusColor(routerManager.status)
     }
 
     /// 详情区空态（2 处共用，文案独立）
@@ -1014,31 +887,6 @@ private enum AddKind { case account, codex }
         .sectionPanel()
     }
 
-    private var refreshSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("自动刷新频率", systemImage: "clock.fill")
-                .font(.headline)
-
-            Picker("刷新频率", selection: $selectedRefreshInterval) {
-                ForEach(refreshOptions, id: \.1) { label, interval in
-                    Text(label).tag(interval)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: selectedRefreshInterval) { newValue in
-                if let activeAccount = accountManager.activeAccount {
-                    accountManager.updateRefreshInterval(newValue, for: activeAccount.id)
-                }
-                balanceManager.updateRefreshInterval(newValue)
-            }
-
-            Text("控制台模式自动重新抓取余额的频率。API Key 模式不消耗此设置。")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .sectionPanel()
-    }
-
     private func linksSection(_ account: ProviderAccount) -> some View {
         let providerName: String
         let docURLString: String
@@ -1167,69 +1015,7 @@ private enum AddKind { case account, codex }
         .sectionPanel()
     }
 
-    private func customURLsSection(_ account: ProviderAccount) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("自定义服务器地址", systemImage: "network")
-                .font(.headline)
-
-            Text("要快速切换 provider（URL + 查询模式 + 路由 + 默认模型 一次性设齐）？请到上方「路由代理」开关下方的预设 chip。")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
-            .padding(.bottom, 4)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
-                    Text("控制台网页 Base URL")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if dashboardURLInput.trimmingCharacters(in: .whitespacesAndNewlines) != initialDashboardURL {
-                        Image(systemName: "circle.dashed")
-                            .foregroundStyle(.orange)
-                            .imageScale(.small)
-                        Text("未保存")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                    }
-                }
-                TextField("https://freemodel.dev", text: $dashboardURLInput)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
-                    Text("API Base URL")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if apiURLInput.trimmingCharacters(in: .whitespacesAndNewlines) != initialApiURL {
-                        Image(systemName: "circle.dashed")
-                            .foregroundStyle(.orange)
-                            .imageScale(.small)
-                        Text("未保存")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                    }
-                }
-                TextField("https://api.freemodel.dev", text: $apiURLInput)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            Button("保存服务器地址") {
-                accountManager.updateURLs(apiURL: apiURLInput, dashboardURL: dashboardURLInput, for: account.id)
-                initialApiURL = apiURLInput
-                initialDashboardURL = dashboardURLInput
-                triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "服务器地址已保存"))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .frame(height: 28)
-            .disabled(apiURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                      dashboardURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            urlPresetStatusBadge
-        }
-        .sectionPanel()
-    }
+// customURLsSection / providerPreset / routerSection / saveRouterSettings 已移至 RouterSettingsView.swift
 
 	    private func tag(_ text: String, systemImage: String) -> some View {
 	        Label(text, systemImage: systemImage)
@@ -1248,57 +1034,6 @@ private enum AddKind { case account, codex }
 
 
     // MARK: - 统一 provider 预设入口（1 次点击设齐 6 个字段）
-
-    private func isPresetActive(_ preset: ProviderPreset, for account: ProviderAccount) -> Bool {
-        // 4 个 preset 的 apiURL 互不相同，仅用 apiBaseURL 一字段就能完整区分
-        return account.apiBaseURL == preset.config.apiURL
-    }
-
-    private func applyProviderPreset(_ preset: ProviderPreset, for account: ProviderAccount) {
-        let cfg = preset.config
-        // 写账号层
-        accountManager.updateURLs(apiURL: cfg.apiURL, dashboardURL: cfg.dashboardURL, for: account.id)
-        accountManager.updateQueryMode(cfg.queryMode, for: account.id)
-        // 同步 router @State（用户当下能直接看到变化）
-        routerUpstreamURL = cfg.routerUpstream
-        routerDefaultModel = cfg.defaultModel
-        routerRouteModel = cfg.routeModel
-        routerStreaming = true
-        routerFailoverEnabled = true
-        saveRouterSettings()
-        // 重新拉 @State
-        loadFieldsFromActiveAccount()
-        // 反馈
-        triggerUrlPresetStatus(UrlPresetStatus(success: true, message: "已切换为 \(preset.rawValue) 预设"))
-    }
-
-    /// 路由段 provider 预设 chip（active = .borderedProminent 蓝底；inactive = .bordered 描边），4 个 preset 共用
-    @ViewBuilder
-    private func providerPresetChip(preset: ProviderPreset, account: ProviderAccount) -> some View {
-        let isActive = isPresetActive(preset, for: account)
-        if isActive {
-            Button(preset.rawValue) {
-                applyProviderPreset(preset, for: account)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .help("当前账号正在使用此预设")
-        } else {
-            Button(preset.rawValue) {
-                applyProviderPreset(preset, for: account)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("1 次点击套用 \(preset.rawValue) 的 URL+查询模式+路由+默认模型+Streaming+Failover")
-        }
-    }
-
-    private func toggleLabel(routerEnabled: Bool, hasAPIKey: Bool) -> String {
-        if !hasAPIKey { return "请先配置 API Key" }
-        return routerEnabled ? "正在运行代理" : "启用本地路由代理"
-    }
-
-    // MARK: - Router Section
 
     private func logRowView(_ log: RouterLogEntry) -> some View {
         let color: Color
@@ -1336,262 +1071,6 @@ private enum AddKind { case account, codex }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func saveRouterSettings() {
-        guard let account = accountManager.activeAccount else { return }
-        let portVal = Int(routerPort) ?? 38440
-        let maxConcurrencyVal = Int(routerMaxConcurrency) ?? 0
-        let minIntervalMsVal = Int(routerMinIntervalMs) ?? 0
-        let newSettings = RouterSettings(
-            enabled: routerEnabled,
-            port: portVal,
-            upstreamBaseURL: routerUpstreamURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            routeModel: routerRouteModel.trimmingCharacters(in: .whitespacesAndNewlines),
-            defaultModel: routerDefaultModel.trimmingCharacters(in: .whitespacesAndNewlines),
-            supportsStreaming: routerStreaming,
-            maxConcurrency: maxConcurrencyVal,
-            minIntervalMs: minIntervalMsVal,
-            failoverEnabled: routerFailoverEnabled
-        )
-        accountManager.updateRouterSettings(newSettings, for: account.id)
-        routerManager.syncStateWithActiveAccount()
-    }
-
-    private func routerSection(_ account: ProviderAccount) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("本地 Responses 路由代理", systemImage: "arrow.triangle.2.circlepath.circle")
-                    .font(.headline)
-                if routerHasUnsavedChanges() {
-                    Image(systemName: "circle.dashed")
-                        .foregroundStyle(.orange)
-                        .imageScale(.small)
-                    Text("未保存")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
-                Spacer()
-                HStack(spacing: 6) {
-                    Text(routerStatusSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let dot = headerStatusDot {
-                        statusDot(color: dot, help: "路由代理状态")
-                    }
-                }
-            }
-
-            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            // Switch
-            HStack {
-                Toggle(isOn: Binding(
-                    get: { routerEnabled },
-                    set: { newValue in
-                        // 仅改本地 @State，由底部「保存及重载配置」统一落盘（与 routerStreaming / routerFailoverEnabled 行为一致）
-                        routerEnabled = newValue
-                    }
-                )) {
-                    Text(toggleLabel(routerEnabled: routerEnabled, hasAPIKey: account.hasAPIKey))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(account.hasAPIKey ? Color.primary : .red)
-                }
-                .disabled(!account.hasAPIKey)
-
-                Spacer()
-            }
-            .padding(.vertical, 4)
-
-            // 缺 API Key 提示卡片（Toggle 禁用 + 视觉警告 + 引导去连接段配置）
-            if !account.hasAPIKey {
-                HStack(alignment: .center, spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("未配置 API Key")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.red)
-                        Text("启用本地路由代理需要 API Key，请先在上方「连接」段配置并测试。")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("去配置") {
-                        // 触发 onChange 走 proxy.scrollTo（apiKeySection 头部已加 .id 锚点）
-                        pendingScrollToAPIKey = true
-                        apiKeyStatus = .empty
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(.orange)
-                    .help("向上滚动到「连接」段配置 API Key")
-                }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.red.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
-                .padding(.bottom, 4)
-            }
-
-            // 1 套统一 provider 预设 chip（4 个，1 次点击设齐 URL+QueryMode+Router+RouteModel+Streaming+Failover）
-            HStack(spacing: 6) {
-                Text("预设:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(ProviderPreset.allCases) { preset in
-                    providerPresetChip(preset: preset, account: account)
-                }
-            }
-            .padding(.bottom, 4)
-
-            if routerEnabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Text("带")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text("*")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                        Text("的字段不能为空。")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    // 3 个重复 provider 按钮已删除（统一到 Toggle 下方 1 套 chip）
-                    
-                    // 4 个输入字段按语义拆 2 组：代理设置（端口+上游URL） / 模型映射（对外+映射）
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("代理设置", systemImage: "network")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 12) {
-                            requiredRouterField(
-                                label: "本地代理端口",
-                                placeholder: "38440",
-                                text: $routerPort,
-                                fieldWidth: 80
-                            )
-
-                            requiredRouterField(
-                                label: "上游 API Base URL",
-                                placeholder: "https://api.deepseek.com/v1",
-                                text: $routerUpstreamURL,
-                                fieldWidth: nil
-                            )
-                        }
-                    }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("模型映射", systemImage: "arrow.left.arrow.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        requiredRouterField(
-                            label: "对外暴露模型名",
-                            placeholder: "codex-mini",
-                            text: $routerRouteModel,
-                            fieldWidth: nil
-                        )
-                        requiredRouterField(
-                            label: "映射到上游模型名",
-                            placeholder: "deepseek-chat",
-                            text: $routerDefaultModel,
-                            fieldWidth: nil
-                        )
-                    }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("最大并发数 (0为无限制)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            TextField("0", text: $routerMaxConcurrency)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("最小请求间隔 (毫秒, 0为无限制)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            TextField("0", text: $routerMinIntervalMs)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                    }
-
-                    // Toggle 一行，按钮单独一行右侧
-                    HStack(spacing: 20) {
-                        Toggle("流式响应 (Streaming)", isOn: $routerStreaming)
-                            .font(.caption)
-                        Toggle("自动灾备转移 (Failover)", isOn: $routerFailoverEnabled)
-                            .font(.caption)
-                        Spacer()
-                    }
-                    HStack {
-                        Spacer()
-                        Button(routerHasUnsavedChanges() ? "保存及重载配置" : "已保存") {
-                            saveRouterSettings()
-                            // 同步 initial，header 未保存态消失
-                            initialRouterEnabled = routerEnabled
-                            initialRouterPort = routerPort
-                            initialRouterUpstreamURL = routerUpstreamURL
-                            initialRouterRouteModel = routerRouteModel
-                            initialRouterDefaultModel = routerDefaultModel
-                            initialRouterStreaming = routerStreaming
-                            initialRouterFailoverEnabled = routerFailoverEnabled
-                            initialRouterMaxConcurrency = routerMaxConcurrency
-                            initialRouterMinIntervalMs = routerMinIntervalMs
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.regular)
-                        .frame(height: 28)
-                        .disabled(!routerIsValid() || !routerHasUnsavedChanges())
-                    }
-                    .padding(.top, 4)
-                }
-                .padding(.all, 10)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.05)))
-            }
-        }
-        .sectionPanel()
-    }
-
-    // MARK: - 路由器设置校验
-
-    private func routerFieldEmpty(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func routerIsValid() -> Bool {
-        !routerFieldEmpty(routerPort)
-            && !routerFieldEmpty(routerUpstreamURL)
-            && !routerFieldEmpty(routerRouteModel)
-            && !routerFieldEmpty(routerDefaultModel)
-    }
-
-    /// 8 字段任一与 initial 不一致即视为有未保存变更（与 URL 段未保存态模式一致）
-    private func routerHasUnsavedChanges() -> Bool {
-        routerEnabled != initialRouterEnabled
-            || routerPort.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterPort.trimmingCharacters(in: .whitespacesAndNewlines)
-            || routerUpstreamURL.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterUpstreamURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            || routerRouteModel.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterRouteModel.trimmingCharacters(in: .whitespacesAndNewlines)
-            || routerDefaultModel.trimmingCharacters(in: .whitespacesAndNewlines) != initialRouterDefaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
-            || routerStreaming != initialRouterStreaming
-            || routerFailoverEnabled != initialRouterFailoverEnabled
-            || routerMaxConcurrency != initialRouterMaxConcurrency
-            || routerMinIntervalMs != initialRouterMinIntervalMs
-    }
-
     // MARK: - Global Logs Console Views & Actions
 
     private var logsHeader: some View {
@@ -1601,8 +1080,8 @@ private enum AddKind { case account, codex }
                     icon: "terminal.fill",
                     tint: .green,
                     title: "路由代理运行日志",
-                    subtitle: routerStatusSubtitle,
-                    dotColor: headerStatusDot
+                    subtitle: routerManager.status.subtitle,
+            dotColor: routerManager.status.statusColor
                 )
                 if let activeAccount = accountManager.activeAccount {
                     let isRunning = routerManager.status == .running
@@ -1610,7 +1089,7 @@ private enum AddKind { case account, codex }
                     let urlString = "http://127.0.0.1:\(portVal)/v1"
                     Button(action: {
                         ClipboardHelper.shared.copy(urlString)
-                        addSuccessToast(value: $baseURLCopiedToast, token: $baseURLCopiedToastToken, message: "Base URL 已复制")
+                        showToast("Base URL 已复制", at: $baseURLCopiedToast)
                     }) {
                         Label("复制 Base URL", systemImage: "doc.on.doc.fill")
                     }
@@ -1750,7 +1229,7 @@ private enum AddKind { case account, codex }
         let count = routerManager.logs.count
         routerManager.logs.removeAll()
         let message = count == 0 ? "当前无日志" : "已清除 \(count) 条日志"
-        addSuccessToast(value: $logsClearedToast, token: $logsClearedToastToken, message: message)
+        showToast(message, at: $logsClearedToast)
     }
 
     private func copyAllLogs() {
@@ -1771,73 +1250,16 @@ private enum AddKind { case account, codex }
         ClipboardHelper.shared.copy(allLogs)
     }
 
-    // MARK: - Toast 自动隐藏（token 模式防过期复活，3 处共用：logsCleared / baseURLCopied / urlPresetStatus）
+    // MARK: - Toast 自动隐藏（Task 取消模式防过期复活）
 
-    /// 添加成功 toast：3 处共用（账号 4 chip / Codex 官方 / Codex 第三方）
-    private func addSuccessToast(
-        value: Binding<String?>,
-        token: Binding<Int>,
-        message: String
-    ) {
-        value.wrappedValue = message
-        autoHideToast(token: token, value: value)
-    }
-
-    /// toast 自动 3 秒后置 nil。token 自增 + 异步检查 token 防止用户在 3 秒内再次触发时旧 timer 复活旧 toast
-    private func autoHideToast<T: Equatable>(token: Binding<Int>, value: Binding<T?>, seconds: Double = 3.0) {
-        token.wrappedValue &+= 1
-        let currentToken = token.wrappedValue
-        Task { @MainActor in
+    private func showToast<T: Equatable>(_ value: T?, at binding: Binding<T?>, seconds: Double = 3.0) {
+        toastTask?.cancel()
+        withAnimation { binding.wrappedValue = value }
+        guard value != nil else { return }
+        toastTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            if token.wrappedValue == currentToken {
-                withAnimation { value.wrappedValue = nil }
-            }
+            withAnimation { binding.wrappedValue = nil }
         }
-    }
-
-    // MARK: - 路由状态文本（侧边栏日志行 + 详情区 header 共用）
-
-    private var routerStatusSubtitle: String {
-        switch routerManager.status {
-        case .off: return "路由未启动"
-        case .starting: return "路由启动中…"
-        case .running: return "路由运行中"
-        case .failed: return "路由启动失败"
-        case .portInUse: return "端口占用"
-        case .missingKey: return "请先配置 API Key"
-        }
-    }
-
-    // MARK: - 详情区段头（始终展开，3 段平等逻辑共用）
-
-    /// 路由段必填字段（label caption2 + 红色星号 + TextField + 必空红描边），4 个 router 字段共用
-    @ViewBuilder
-    private func requiredRouterField(label: String, placeholder: String, text: Binding<String>, fieldWidth: CGFloat?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 2) {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                if routerFieldEmpty(text.wrappedValue) {
-                    requiredFieldStar()
-                }
-            }
-            let textField = TextField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder)
-                .overlay(RoundedRectangle(cornerRadius: 5).stroke(routerFieldEmpty(text.wrappedValue) ? .red.opacity(0.6) : .clear, lineWidth: 1.5))
-            if let fieldWidth = fieldWidth {
-                textField.frame(width: fieldWidth)
-            } else {
-                textField
-            }
-        }
-    }
-
-    /// 路由段必填字段红色星号 *（4 个 router 字段共用，0 risk）
-    private func requiredFieldStar() -> some View {
-        Text("*")
-            .font(.caption2)
-            .foregroundStyle(.red)
     }
 
     /// 内联添加行字段标签：56pt 固定宽 + caption 灰底（与右侧 TextField 对齐），3 处共用
@@ -1924,7 +1346,7 @@ private enum AddKind { case account, codex }
         switch title {
         case "账号": return "账号信息已配置"
         case "连接": return "控制台已登录且 API Key 已配置"
-        case "路由": return routerStatusSubtitle
+        case "路由": return routerManager.status.subtitle
         default: return ""
         }
     }
@@ -1940,11 +1362,6 @@ private enum AddKind { case account, codex }
         // 连接段：控制台已登录 或 API Key 已设 = 绿；都未设 = 红
         if account.hasDashboardSession || account.hasAPIKey { return .green }
         return .red
-    }
-
-    private func routerHeaderStatusColor() -> Color? {
-        // 路由段：复用 routerStatusColor
-        return routerStatusColor(routerManager.status)
     }
 
     // MARK: - URL 打开（if let URL + NSWorkspace.open 同一来源，3 处共用）
@@ -1981,7 +1398,7 @@ private enum AddKind { case account, codex }
         let account = accountManager.createAccount(displayName: newAccountLabel, providerID: providerID)
         selectAccountAndSync(id: account.id)
         addExpanded = nil
-        addSuccessToast(value: $accountCreatedToast, token: $accountCreatedToastToken, message: "已添加：\(account.displayName) · \(providerDisplayName)")
+        showToast("已添加：\(account.displayName) · \(providerDisplayName)", at: $accountCreatedToast)
     }
 
     // MARK: - 重命名账号提交（trim + 非空 + renameAccount 同一来源，3 处共用）
@@ -1992,17 +1409,6 @@ private enum AddKind { case account, codex }
         guard !trimmed.isEmpty else { return false }
         accountManager.renameAccount(id: accountID, displayName: trimmed)
         return true
-    }
-
-    // MARK: - 路由状态颜色（顶栏 / 详情区 / 日志行 共用单一来源）
-
-    private func routerStatusColor(_ status: RouterStatus) -> Color? {
-        switch status {
-        case .running: return .green
-        case .starting: return .orange
-        case .failed, .portInUse, .missingKey: return .red
-        case .off: return nil
-        }
     }
 
     // MARK: - API Key 状态徽章（内嵌文本框右下角，统一 22pt 高，0.2s 淡入）
@@ -2026,49 +1432,6 @@ private enum AddKind { case account, codex }
         }
     }
 
-    // MARK: - URL 预设切换反馈徽章（内嵌 customURLsSection 末尾）
-
-    @ViewBuilder
-    private var urlPresetStatusBadge: some View {
-        if let status = urlPresetStatus {
-            StatusBadge(
-                icon: status.success ? "checkmark.circle.fill" : "xmark.circle.fill",
-                text: status.message,
-                tint: status.success ? .green : .red
-            )
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: urlPresetStatus)
-        }
-    }
-
-    private func triggerUrlPresetStatus(_ status: UrlPresetStatus) {
-        urlPresetStatus = status
-        // 3 秒后自动隐藏（与 logsClearedToast / baseURLCopiedToast 同模式，token 防过期 toast 复活）
-        autoHideToast(token: $urlPresetStatusToken, value: $urlPresetStatus)
-    }
 }
 
-private extension View {
-    /// 详情区段背景（gray 8pt 圆角 panel）——8 处统一使用
-    func sectionPanel() -> some View {
-        self
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.surfaceElevatedFill))
-    }
-
-    /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
-    func sectionVStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 16, content: content)
-    }
-
-    /// 侧边栏内联添加行背景（blue 6pt 圆角小卡片）——2 处统一使用（账号 + Codex 注入）
-    func addRowPanel() -> some View {
-        self
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.blue.opacity(0.08))
-            )
-    }
-}
+// sectionPanel / sectionVStack / addRowPanel 已移至 ViewExtensions.swift
