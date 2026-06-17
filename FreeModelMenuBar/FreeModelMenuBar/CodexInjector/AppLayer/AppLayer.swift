@@ -132,14 +132,19 @@ public final class AppLayer: ObservableObject {
     }
 
     public func refresh() async {
+        // 三路 IO 互不依赖，async let 并发比串行 await 快（本地文件读在小机器上也能省下几十毫秒）。
+        // config 路径保持原「失败回退到空 Snapshot」语义，单独一个 task 包裹 try?。
         do {
-            let s = try await auth.currentState()
-            let c = try await provider.currentCatalog()
-            let snap = (try? await config.currentSnapshot()) ?? ConfigLayer.Snapshot()
+            async let stateTask = auth.currentState()
+            async let catalogTask = provider.currentCatalog()
+            async let snapTask: ConfigLayer.Snapshot = {
+                (try? await config.currentSnapshot()) ?? ConfigLayer.Snapshot()
+            }()
+            let (state, catalog, snapshot) = try await (stateTask, catalogTask, snapTask)
             await MainActor.run {
-                self.authState = s
-                self.providerCatalog = c
-                self.configSnapshot = snap
+                self.authState = state
+                self.providerCatalog = catalog
+                self.configSnapshot = snapshot
             }
         } catch {
             await MainActor.run { self.lastError = "Refresh failed: \(error)" }
