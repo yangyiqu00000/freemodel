@@ -21,6 +21,16 @@ struct AccountSettingsView: View {
 
     private enum ApiKeyStatus: Equatable {
         case empty, unsaved, testing, verified, failed(String), saved
+
+        // 用户编辑输入时调用：若当前是已验证/已保存，则回到未保存状态（TextField/SecureField 4 处共用）
+        mutating func markUnsavedIfPersisted() {
+            switch self {
+            case .verified, .saved:
+                self = .unsaved
+            default:
+                break
+            }
+        }
     }
     @State private var apiKeyStatus: ApiKeyStatus = .empty
     @State private var apiKeyInput: String = ""
@@ -207,16 +217,14 @@ struct AccountSettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
                             .onChange(of: apiKeyInput) { _ in
-                                if case .verified = apiKeyStatus { apiKeyStatus = .unsaved }
-                                if case .saved = apiKeyStatus { apiKeyStatus = .unsaved }
+                                apiKeyStatus.markUnsavedIfPersisted()
                             }
                     } else {
                         SecureField("sk-...", text: $apiKeyInput)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
                             .onChange(of: apiKeyInput) { _ in
-                                if case .verified = apiKeyStatus { apiKeyStatus = .unsaved }
-                                if case .saved = apiKeyStatus { apiKeyStatus = .unsaved }
+                                apiKeyStatus.markUnsavedIfPersisted()
                             }
                     }
                     apiKeyStatusBadge
