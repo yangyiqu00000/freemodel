@@ -19,7 +19,10 @@ final class KeychainHelper {
         // 先删除已有的
         delete(key: key)
 
-        let data = value.data(using: .utf8)!
+        guard let data = value.data(using: .utf8) else {
+            print("Keychain save error: value is not valid UTF-8")
+            return
+        }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
