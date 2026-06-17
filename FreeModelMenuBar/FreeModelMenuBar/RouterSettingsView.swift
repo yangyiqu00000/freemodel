@@ -26,35 +26,51 @@ enum ProviderPreset: String, CaseIterable, Identifiable {
     }
 
     var config: Config {
-        switch self {
-        case .freeModel:
-            return .init(apiURL: "https://api.freemodel.dev",
-                         dashboardURL: "https://freemodel.dev",
-                         queryMode: .dashboard,
-                         routerUpstream: "https://api.freemodel.dev/v1",
-                         defaultModel: "codex-mini",
-                         routeModel: "codex-mini")
-        case .deepseek:
-            return .init(apiURL: "https://api.deepseek.com",
-                         dashboardURL: "https://platform.deepseek.com",
-                         queryMode: .apiKey,
-                         routerUpstream: "https://api.deepseek.com/v1",
-                         defaultModel: "deepseek-chat",
-                         routeModel: "codex-mini")
-        case .openRouter:
-            return .init(apiURL: "https://openrouter.ai/api/v1",
-                         dashboardURL: "https://openrouter.ai",
-                         queryMode: .apiKey,
-                         routerUpstream: "https://openrouter.ai/api/v1",
-                         defaultModel: "deepseek/deepseek-v4-flash:free",
-                         routeModel: "codex-mini")
-        case .modelScope:
-            return .init(apiURL: "https://api-inference.modelscope.cn",
-                         dashboardURL: "https://modelscope.cn",
-                         queryMode: .apiKey,
-                         routerUpstream: "https://api-inference.modelscope.cn/v1",
-                         defaultModel: "ZhipuAI/GLM-5.1",
-                         routeModel: "codex-mini")
+        Self.config(for: self)
+    }
+
+    private static let freeModelConfig = Config(
+        apiURL: "https://api.freemodel.dev",
+        dashboardURL: "https://freemodel.dev",
+        queryMode: .dashboard,
+        routerUpstream: "https://api.freemodel.dev/v1",
+        defaultModel: "codex-mini",
+        routeModel: "codex-mini"
+    )
+
+    private static let deepseekConfig = Config(
+        apiURL: "https://api.deepseek.com",
+        dashboardURL: "https://platform.deepseek.com",
+        queryMode: .apiKey,
+        routerUpstream: "https://api.deepseek.com/v1",
+        defaultModel: "deepseek-chat",
+        routeModel: "codex-mini"
+    )
+
+    private static let openRouterConfig = Config(
+        apiURL: "https://openrouter.ai/api/v1",
+        dashboardURL: "https://openrouter.ai",
+        queryMode: .apiKey,
+        routerUpstream: "https://openrouter.ai/api/v1",
+        defaultModel: "deepseek/deepseek-v4-flash:free",
+        routeModel: "codex-mini"
+    )
+
+    private static let modelScopeConfig = Config(
+        apiURL: "https://api-inference.modelscope.cn",
+        dashboardURL: "https://modelscope.cn",
+        queryMode: .apiKey,
+        routerUpstream: "https://api-inference.modelscope.cn/v1",
+        defaultModel: "ZhipuAI/GLM-5.1",
+        routeModel: "codex-mini"
+    )
+
+    private static func config(for preset: ProviderPreset) -> Config {
+        switch preset {
+        case .freeModel: return freeModelConfig
+        case .deepseek: return deepseekConfig
+        case .openRouter: return openRouterConfig
+        case .modelScope: return modelScopeConfig
         }
     }
 }
