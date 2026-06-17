@@ -54,11 +54,7 @@ private enum AddKind { case account, codex }
     @State private var renameInput: String = ""
     @State private var pendingDeleteCodexConfig: InjectionConfiguration? = nil
 
-    // 日志清除 toast
-    @State private var logsClearedToast: String? = nil
     @State private var pendingScrollToAPIKey: Bool = false
-    // 复制 Base URL toast
-    @State private var baseURLCopiedToast: String? = nil
     // 添加账号 toast（账号 4 chip 共用）
     @State private var accountCreatedToast: String? = nil
     // 添加 Codex 注入 toast（官方 / 第三方 共用）
@@ -115,8 +111,10 @@ private enum AddKind { case account, codex }
                                 emptyStateView(.accountGone)
                             }
                         case .logs:
-                            logsHeader
-                            logsConsoleSection
+                            LogsConsoleView(
+                                routerManager: routerManager,
+                                accountManager: accountManager
+                            )
                         case .codexInjectionConfig(let cfgID):
                             CodexInjectionSettingsView(
                                 appLayer: codexInjectionLayer,
@@ -1071,184 +1069,8 @@ private enum AddKind { case account, codex }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Global Logs Console Views & Actions
-
-    private var logsHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
-                navHeader(
-                    icon: "terminal.fill",
-                    tint: .green,
-                    title: "路由代理运行日志",
-                    subtitle: routerManager.status.subtitle,
-            dotColor: routerManager.status.statusColor
-                )
-                if let activeAccount = accountManager.activeAccount {
-                    let isRunning = routerManager.status == .running
-                    let portVal = activeAccount.activeRouterSettings.port
-                    let urlString = "http://127.0.0.1:\(portVal)/v1"
-                    Button(action: {
-                        ClipboardHelper.shared.copy(urlString)
-                        showToast("Base URL 已复制", at: $baseURLCopiedToast)
-                    }) {
-                        Label("复制 Base URL", systemImage: "doc.on.doc.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(!isRunning)
-                    .help(isRunning ? "复制 \(urlString) 到剪贴板" : "启动路由代理后才可复制 Base URL")
-                    toastBadge(value: baseURLCopiedToast, icon: "doc.on.doc.fill", tint: .blue)
-                }
-            }
-
-            // 三段式：账号 / 监听 / 上游（每段独立换行不重叠）
-            if let activeAccount = accountManager.activeAccount {
-                let settings = activeAccount.activeRouterSettings
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("账号")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text(activeAccount.displayName)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    if settings.enabled && routerManager.status == .running {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("监听")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("http://127.0.0.1:\(settings.port)/v1")
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("上游")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text(settings.upstreamBaseURL)
-                                .font(.system(.caption, design: .monospaced))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .textSelection(.enabled)
-                        }
-                    }
-                    Spacer()
-                }
-                .font(.caption)
-            } else {
-                Text("请先添加并激活一个账号以配置和启动路由。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var logsConsoleSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // 日志控制：复制 / 清除
-            HStack(spacing: 12) {
-                Button(action: copyAllLogs) {
-                    Label("复制所有日志", systemImage: "doc.on.doc.fill")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .frame(height: 28)
-                .disabled(routerManager.logs.isEmpty)
-
-                Button(action: clearLogsWithToast) {
-                    Label("清除日志", systemImage: "trash.fill")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .frame(height: 28)
-                .disabled(routerManager.logs.isEmpty)
-
-                toastBadge(value: logsClearedToast, icon: "trash.fill", tint: .secondary)
-                Spacer()
-            }
-
-            // Console terminal container
-            VStack(alignment: .leading, spacing: 6) {
-                Text("控制台输出 (最近 50 条)")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        if routerManager.logs.isEmpty {
-                            Text("无日志数据")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.gray)
-                                .padding(.vertical, 8)
-                        } else {
-                            ForEach(routerManager.logs) { log in
-                                logRowView(log)
-                                    .contextMenu {
-                                        Button("复制此行") {
-                                            copySingleLog(log)
-                                        }
-                                        if let err = log.error, !err.isEmpty {
-                                            Button("复制错误详情") {
-                                                ClipboardHelper.shared.copy(err)
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                    }
-                    .padding(8)
-                }
-                .frame(minHeight: 340, maxHeight: .infinity)
-                .background(Color.black)
-                .cornerRadius(6)
-                .textSelection(.enabled) // Enable native text selection
-            }
-        }
-    }
-
-    private func copySingleLog(_ log: RouterLogEntry) {
-        let text: String
-        let timeStr = "[\(log.time)]"
-        let methodStr = log.method
-        if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
-            text = "\(timeStr) \(methodStr): \(log.error ?? "")"
-        } else {
-            var mainLog = "\(timeStr) \(methodStr): \(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)"
-            if let error = log.error {
-                mainLog += " - Err: \(error)"
-            }
-            text = mainLog
-        }
-        ClipboardHelper.shared.copy(text)
-    }
-
-    private func clearLogsWithToast() {
-        let count = routerManager.logs.count
-        routerManager.logs.removeAll()
-        let message = count == 0 ? "当前无日志" : "已清除 \(count) 条日志"
-        showToast(message, at: $logsClearedToast)
-    }
-
-    private func copyAllLogs() {
-        let logTexts = routerManager.logs.reversed().map { log -> String in
-            let timeStr = "[\(log.time)]"
-            let methodStr = log.method
-            if log.method == "SYS" || log.method == "INFO" || log.method == "ERROR" {
-                return "\(timeStr) \(methodStr): \(log.error ?? "")"
-            } else {
-                var mainLog = "\(timeStr) \(methodStr): \(log.path) \(log.status) (\(log.duration)ms) | \(log.model) -> \(log.upstream)"
-                if let error = log.error {
-                    mainLog += " - Err: \(error)"
-                }
-                return mainLog
-            }
-        }
-        let allLogs = logTexts.joined(separator: "\n")
-        ClipboardHelper.shared.copy(allLogs)
-    }
+    // MARK: - Logs Console View
+    // 已提取至 LogsConsoleView.swift
 
     // MARK: - Toast 自动隐藏（Task 取消模式防过期复活）
 
@@ -1302,28 +1124,6 @@ private enum AddKind { case account, codex }
             Spacer()
             if let trailing = trailing {
                 trailing
-            }
-        }
-    }
-
-    /// 详情区顶部 nav header（icon + title2 bold 标题 + caption 副标题 + 可选 dot），2 处共用
-    private func navHeader(icon: String, tint: Color, title: String, subtitle: String, dotColor: Color? = nil) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(tint)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                HStack(spacing: 6) {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let color = dotColor {
-                        statusDot(color: color, help: "路由代理状态")
-                    }
-                }
             }
         }
     }

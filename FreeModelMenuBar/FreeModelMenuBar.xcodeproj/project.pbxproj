@@ -81,6 +81,7 @@
 				<string>fileStatusBadge</string>
 				<string>fileViewExtensions</string>
 				<string>fileRouterSettingsView</string>
+				<string>fileLogsConsoleView</string>
 				<string>fileRouterSidecar</string>
 				<string>fileAssets</string>
 			</array>
@@ -313,6 +314,7 @@
 				<string>buildFileStatusBadge</string>
 				<string>buildFileViewExtensions</string>
 				<string>buildFileRouterSettingsView</string>
+				<string>buildFileLogsConsoleView</string>
 			</array>
 			<key>runOnlyForDeploymentPostprocessing</key>
 			<string>0</string>
@@ -1237,6 +1239,29 @@
 			<string>PBXBuildFile</string>
 			<key>fileRef</key>
 			<string>fileRouterSettingsView</string>
+		</dict>
+
+		<key>fileLogsConsoleView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>fileEncoding</key>
+			<string>4</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>name</key>
+			<string>LogsConsoleView.swift</string>
+			<key>path</key>
+			<string>LogsConsoleView.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>buildFileLogsConsoleView</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+			<key>fileRef</key>
+			<string>fileLogsConsoleView</string>
 		</dict>
 
 		<!-- Product Reference -->

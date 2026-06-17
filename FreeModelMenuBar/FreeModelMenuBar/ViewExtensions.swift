@@ -61,6 +61,28 @@ extension View {
                     .fill(Color.blue.opacity(0.08))
             )
     }
+
+    /// 导航区 Header（设置窗口标题 + 日志段标题共用）
+    func navHeader(icon: String, tint: Color, title: String, subtitle: String, dotColor: Color? = nil) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                HStack(spacing: 6) {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let color = dotColor {
+                        statusDot(color: color, help: "路由代理状态")
+                    }
+                }
+            }
+        }
+    }
 }
 
 extension Binding where Value == Bool {
