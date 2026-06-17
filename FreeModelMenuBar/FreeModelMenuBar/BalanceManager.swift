@@ -414,6 +414,16 @@ class BalanceManager: ObservableObject {
             ]
         }
 
+        // OpenRouter 专用：它的余额是 credit 体系（不是 OpenAI 的 hard_limit_usd），
+        // 唯一有效端点是 /api/v1/auth/key，返回 { data: { limit, usage, limit_remaining } }。
+        // OpenAI 通用端点（/v1/dashboard/billing/*）在 OpenRouter 返回 HTML 404，不能用。
+        if account.providerID == "openrouter" || apiURL.contains("openrouter.ai") {
+            return [
+                "/api/v1/auth/key",
+                "/api/v1/key"
+            ]
+        }
+
         return [
             "/v1/dashboard/billing/subscription",
             "/v1/dashboard/billing/credit_grants",
@@ -461,7 +471,29 @@ class BalanceManager: ObservableObject {
 
     /// 解析余额响应数据
     private func parseBalanceResponse(_ data: Data, endpoint: String) throws -> BalanceInfo {
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+
+        // OpenRouter /api/v1/auth/key 格式：{ data: { label, usage, limit, limit_remaining, ... } }
+        // data 是字典（不是数组），需要 unwrap 后再走通用解析。
+        if let dataObj = json["data"] as? [String: Any] {
+            json = dataObj
+        }
+
+        // OpenRouter credit 格式（/api/v1/auth/key unwrap 后）：usage + limit + limit_remaining
+        // limit 可能为 null（无月限额 = 用多少扣多少）。有 limit 时：已用=usage, 总额=limit, 剩余=limit_remaining。
+        if json["limit_remaining"] != nil {
+            let limit = parseDouble(json["limit"])
+            let usage = parseDouble(json["usage"])
+            let remaining = parseDouble(json["limit_remaining"])
+            return BalanceInfo(
+                totalGranted: limit,
+                totalUsed: usage,
+                totalRemaining: remaining,
+                expiresAt: nil,
+                lastUpdated: Date(),
+                currency: "USD"
+            )
+        }
 
         // DeepSeek 格式: balance_infos
         if let balanceInfos = json["balance_infos"] as? [[String: Any]],
