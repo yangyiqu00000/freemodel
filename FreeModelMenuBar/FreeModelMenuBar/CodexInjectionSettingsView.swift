@@ -2,11 +2,20 @@
 //  CodexInjectionSettingsView.swift
 //  FreeModelMenuBar
 //
-//  单条注入配置的"详情区"。由 SettingsView 在右侧主区域渲染。
-//  不再有 sheet / popover / DisclosureGroup / swipeActions。
-//  顶部：label + 激活徽章（含激活时间）+ 已自动保存徽章。
-//  主体：标签 + Provider 两个文本框，附未保存还原按钮；auth.json + config.toml 两个自适应高度编辑框（官方配置在 auth.json 上方提供抓取链接）。
-//  底部：3 按钮（激活此配置 / 恢复默认 / 删除）等高对齐。
+//  单条注入配置详情页 — 完全重做。
+//
+//  重做原因：旧实现把 auth.json / config.toml 放在自定义 NSTextView 里，
+//  在 SwiftUI 嵌套下表现"全黑 + 滑到底能看见按钮 + 框/内容全不可见"。
+//  根本原因在 NSTextView + NSAttributedString 路线，缝补无效。
+//
+//  新实现：
+//  - 完全用 SwiftUI 原生控件（TextField / TextEditor）
+//  - 外层：浅色卡片（regularMaterial 背景 + 显式边框），与右侧其它详情页视觉一致
+//  - 编辑器：TextEditor + monospaced 字体 + 浅色背景 + 圆角边框，frame(minHeight: 200, idealHeight: 260, maxHeight: 320)
+//  - 顶部：标题 + 激活/未激活徽章；自动保存反馈放在右上角
+//  - 中部：标签 / Provider 两个输入框（带"还原"小按钮）
+//  - 编辑区：auth.json + config.toml 两个 TextEditor，自带"抓取当前 ~/.codex 状态"按钮（仅官方配置）
+//  - 底部：激活 / 恢复默认 / 删除 三按钮，永远在卡片底部固定可见
 //
 
 import SwiftUI
@@ -16,208 +25,201 @@ struct CodexInjectionSettingsView: View {
     let configurationID: String
     @Binding var pendingDeleteCodexConfig: InjectionConfiguration?
 
-    // 进入详情页时的"创建时" label / providerID（用于 undo 按钮）
+    // 创建时 label / providerID（用于 undo 按钮）
     @State private var initialLabel: String = ""
     @State private var initialProviderID: String = ""
     @State private var didCaptureInitial: Bool = false
 
-    // "已自动保存" 反馈：用户改任意字段立即更新，下次变更覆盖
+    // "已自动保存"反馈
     @State private var autoSavedAt: Date? = nil
 
     var body: some View {
-        if let cfg = currentConfig {
-            VStack(alignment: .leading, spacing: 16) {
-                header(cfg)
-                Divider()
-                labelsAndProvider(cfg)
-                editors(cfg)
-                bottomActions(cfg)
+        Group {
+            if let cfg = currentConfig {
+                content(for: cfg)
+            } else {
+                emptyState
             }
-            .padding(20)
-            .task { await appLayer.refresh() }
-            .onAppear {
-                if !didCaptureInitial {
-                    initialLabel = cfg.label
-                    initialProviderID = cfg.providerID
-                    didCaptureInitial = true
-                }
-            }
-            .onChange(of: cfg.label) { _ in triggerAutoSaveToast() }
-            .onChange(of: cfg.providerID) { _ in triggerAutoSaveToast() }
-            .onChange(of: cfg.authJSON) { _ in triggerAutoSaveToast() }
-            .onChange(of: cfg.configTOML) { _ in triggerAutoSaveToast() }
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Image(systemName: "questionmark.circle")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-                Text("该注入配置已不存在。")
-                    .foregroundStyle(.secondary)
-                Button("关闭") { /* 父层负责清 selectedItem */ }
-                    .disabled(true)
-            }
-            .padding(20)
         }
+        .task { await appLayer.refresh() }
     }
 
-    private var currentConfig: InjectionConfiguration? {
-        appLayer.injectionConfigurations.first(where: { $0.id == configurationID })
+    // MARK: - 主内容
+
+    @ViewBuilder
+    private func content(for cfg: InjectionConfiguration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header(for: cfg)
+                .padding(.bottom, 12)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    basicInfoSection(for: cfg)
+                    editorsSection(for: cfg)
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(maxHeight: .infinity)
+
+            Divider().padding(.vertical, 8)
+
+            bottomActions(for: cfg)
+        }
+        .padding(20)
+        .background(cardBackground)
+        .overlay(cardBorder)
+        .onAppear { captureInitialIfNeeded(cfg) }
+        .onChange(of: cfg.label) { _ in triggerAutoSaveToast() }
+        .onChange(of: cfg.providerID) { _ in triggerAutoSaveToast() }
+        .onChange(of: cfg.authJSON) { _ in triggerAutoSaveToast() }
+        .onChange(of: cfg.configTOML) { _ in triggerAutoSaveToast() }
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: "questionmark.circle")
+                .font(.title)
+                .foregroundStyle(.secondary)
+            Text("该注入配置已不存在。")
+                .foregroundStyle(.secondary)
+        }
+        .padding(20)
     }
 
     // MARK: - 头部
 
-    private func header(_ cfg: InjectionConfiguration) -> some View {
-        HStack {
+    private func header(for cfg: InjectionConfiguration) -> some View {
+        HStack(alignment: .center, spacing: 10) {
             Image(systemName: "key.horizontal.fill")
                 .font(.title2)
                 .foregroundStyle(.blue)
-            Text("Codex 注入").font(.title2).fontWeight(.bold)
-            Text("·").foregroundStyle(.secondary)
-            Text(cfg.label).font(.title3).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Codex 注入")
+                    .font(.title2).fontWeight(.bold)
+                Text(cfg.label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
-            activeStatusBadge(cfg)
+            activeBadge(for: cfg)
             if let savedAt = autoSavedAt {
-                Spacer().frame(width: 8)
                 autoSavedBadge(at: savedAt)
             }
         }
     }
 
     @ViewBuilder
-    private func activeStatusBadge(_ cfg: InjectionConfiguration) -> some View {
+    private func activeBadge(for cfg: InjectionConfiguration) -> some View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
         if isActive, let activatedAt = appLayer.activeInjection?.activatedAt {
-            // 激活态：显示激活时间，让用户看到"激活多久了"——比单字"已激活"信息密度高
             HStack(spacing: 6) {
                 StatusBadge(icon: "checkmark.circle.fill", text: "已激活", tint: .green)
-                Text("·").foregroundStyle(.secondary)
                 Text(activatedAt, style: .time)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
-            .font(.caption)
             .help("激活于 \(activatedAt.formatted(date: .abbreviated, time: .standard))")
         } else {
             StatusBadge(icon: "circle.dashed", text: "未激活", tint: .secondary)
         }
     }
 
-    private func labelsAndProvider(_ cfg: InjectionConfiguration) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
-                    Text("标签").font(.caption).foregroundStyle(.secondary)
-                    if cfg.label != initialLabel {
-                        Button {
-                            var copy = cfg
-                            copy.label = initialLabel
-                            appLayer.updateConfiguration(copy)
-                        } label: {
-                            Image(systemName: "arrow.uturn.backward.circle")
-                                .imageScale(.small)
-                        }
-                        .buttonStyle(.borderless)
-                        .help("还原为本条配置创建时的标签")
-                    }
-                }
-                TextField("标签", text: Binding(
-                    get: { cfg.label },
-                    set: { newValue in
-                        var copy = cfg
-                        copy.label = newValue
-                        appLayer.updateConfiguration(copy)
-                    }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.regular)
-                .frame(maxWidth: 220, minHeight: 28)
+    // MARK: - 基本信息（标签 / Provider）
+
+    private func basicInfoSection(for cfg: InjectionConfiguration) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("基本信息", systemImage: "tag")
+            HStack(alignment: .top, spacing: 16) {
+                labeledTextField(
+                    label: "标签",
+                    placeholder: "标签",
+                    text: bindingForLabel(cfg),
+                    initialValue: initialLabel,
+                    onRevert: { revertLabel(cfg) }
+                )
+                labeledTextField(
+                    label: "Provider",
+                    placeholder: "provider id",
+                    text: bindingForProvider(cfg),
+                    initialValue: initialProviderID,
+                    onRevert: { revertProvider(cfg) }
+                )
+                Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
-                    Text("Provider").font(.caption).foregroundStyle(.secondary)
-                    if cfg.providerID != initialProviderID {
-                        Button {
-                            var copy = cfg
-                            copy.providerID = initialProviderID
-                            appLayer.updateConfiguration(copy)
-                        } label: {
-                            Image(systemName: "arrow.uturn.backward.circle")
-                                .imageScale(.small)
-                        }
-                        .buttonStyle(.borderless)
-                        .help("还原为本条配置创建时的 Provider")
-                    }
-                }
-                TextField("provider id", text: Binding(
-                    get: { cfg.providerID },
-                    set: { newValue in
-                        var copy = cfg
-                        copy.providerID = newValue
-                        appLayer.updateConfiguration(copy)
-                    }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.regular)
-                .frame(maxWidth: 220, minHeight: 28)
-            }
-            Spacer()
         }
     }
 
-    // MARK: - 编辑区
+    // MARK: - 编辑区（auth.json + config.toml）
 
-    private func editors(_ cfg: InjectionConfiguration) -> some View {
+    private func editorsSection(for cfg: InjectionConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if cfg.kind == .official {
-                HStack {
-                    Text("auth.json (\(cfg.authJSON.count) 字符)").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button {
-                        appLayer.captureCurrentCodexState(into: cfg.id)
-                    } label: {
-                        Label("抓取当前 ~/.codex/auth.json 到这里", systemImage: "square.and.arrow.down")
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .help("在终端跑完 `codex` 完成 ChatGPT 登录后，点此把当前真实状态保存到本条配置。")
-                }
-            } else {
-                Text("auth.json (\(cfg.authJSON.count) 字符)").font(.caption).foregroundStyle(.secondary)
-            }
-            CodeEditorView(
-                text: Binding(
-                    get: { cfg.authJSON },
-                    set: { newValue in
-                        var copy = cfg
-                        copy.authJSON = newValue
-                        appLayer.updateConfiguration(copy)
-                    }
-                ),
+            sectionHeader("注入内容", systemImage: "doc.text")
+            editorBlock(
+                title: "auth.json",
                 language: .json,
-                minHeight: 60,
-                maxHeight: 320
+                charCount: cfg.authJSON.count,
+                extraHeader: cfg.kind == .official ? AnyView(captureButton(for: cfg)) : nil,
+                text: bindingForAuthJSON(cfg)
             )
-
-            Text("config.toml (\(cfg.configTOML.count) 字符)").font(.caption).foregroundStyle(.secondary)
-            CodeEditorView(
-                text: Binding(
-                    get: { cfg.configTOML },
-                    set: { newValue in
-                        var copy = cfg
-                        copy.configTOML = newValue
-                        appLayer.updateConfiguration(copy)
-                    }
-                ),
+            editorBlock(
+                title: "config.toml",
                 language: .toml,
-                minHeight: 60,
-                maxHeight: 320
+                charCount: cfg.configTOML.count,
+                extraHeader: nil,
+                text: bindingForConfigTOML(cfg)
             )
+        }
+    }
+
+    private func captureButton(for cfg: InjectionConfiguration) -> AnyView {
+        AnyView(
+            Button {
+                appLayer.captureCurrentCodexState(into: cfg.id)
+            } label: {
+                Label("抓取当前 ~/.codex/auth.json", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .help("在终端跑完 `codex` 完成 ChatGPT 登录后，点此把当前真实状态保存到本条配置。")
+        )
+    }
+
+    @ViewBuilder
+    private func editorBlock(
+        title: String,
+        language: CodeLanguage,
+        charCount: Int,
+        extraHeader: AnyView?,
+        text: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("\(title) (\(charCount) 字符)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let extra = extraHeader { extra }
+            }
+            CodeEditorView(text: text, language: language)
         }
     }
 
     // MARK: - 底部操作
 
-    private func bottomActions(_ cfg: InjectionConfiguration) -> some View {
+    private func bottomActions(for cfg: InjectionConfiguration) -> some View {
         let isActive = (appLayer.activeInjection?.configurationID == cfg.id)
-        return HStack(spacing: 12) {
+        return HStack(spacing: 10) {
             Button {
                 appLayer.activateConfiguration(id: cfg.id)
             } label: {
@@ -226,7 +228,6 @@ struct CodexInjectionSettingsView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
-            .frame(height: 28)
             .tint(.green)
             .disabled(isActive)
             .help(isActive ? "当前已是激活状态" : "把当前编辑的 auth.json + config.toml 写入 ~/.codex/")
@@ -239,12 +240,10 @@ struct CodexInjectionSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
-            .frame(height: 28)
             .tint(.gray)
             .disabled(!isActive)
             .help(isActive ? "清空 ~/.codex/auth.json + ~/.codex/config.toml，回到初始 Codex 状态" : "当前未激活，无需恢复")
 
-            // 删除按钮（不依赖 contextMenu）：触发父层 confirmationDialog
             Button(role: .destructive) {
                 pendingDeleteCodexConfig = cfg
             } label: {
@@ -254,22 +253,51 @@ struct CodexInjectionSettingsView: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
             .tint(.red)
-            .frame(minWidth: 80, maxWidth: .infinity)
-            .frame(height: 28)
             .help("删除本条注入配置（清空编辑中的 auth.json + config.toml）")
+        }
+        .frame(height: 32)
+    }
+
+    // MARK: - 通用小组件
+
+    private func sectionHeader(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
         }
     }
 
-    // MARK: - "已自动保存" 反馈辅助
-
-    private static let autoSavedTimeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
-    private func triggerAutoSaveToast() {
-        autoSavedAt = Date()
+    private func labeledTextField(
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        initialValue: String,
+        onRevert: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if text.wrappedValue != initialValue {
+                    Button(action: onRevert) {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                            .imageScale(.small)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("还原为创建时的 \(label)")
+                }
+            }
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.regular)
+                .frame(minWidth: 180)
+        }
     }
 
     private func autoSavedBadge(at date: Date) -> some View {
@@ -281,5 +309,85 @@ struct CodexInjectionSettingsView: View {
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.2), value: autoSavedAt)
     }
+
+    // MARK: - 辅助
+
+    private var currentConfig: InjectionConfiguration? {
+        appLayer.injectionConfigurations.first(where: { $0.id == configurationID })
+    }
+
+    private func captureInitialIfNeeded(_ cfg: InjectionConfiguration) {
+        guard !didCaptureInitial else { return }
+        initialLabel = cfg.label
+        initialProviderID = cfg.providerID
+        didCaptureInitial = true
+    }
+
+    private func triggerAutoSaveToast() {
+        autoSavedAt = Date()
+    }
+
+    private static let autoSavedTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    // MARK: - Bindings / Revert helpers
+
+    private func bindingForLabel(_ cfg: InjectionConfiguration) -> Binding<String> {
+        Binding(
+            get: { cfg.label },
+            set: { newValue in
+                var copy = cfg
+                copy.label = newValue
+                appLayer.updateConfiguration(copy)
+            }
+        )
+    }
+
+    private func bindingForProvider(_ cfg: InjectionConfiguration) -> Binding<String> {
+        Binding(
+            get: { cfg.providerID },
+            set: { newValue in
+                var copy = cfg
+                copy.providerID = newValue
+                appLayer.updateConfiguration(copy)
+            }
+        )
+    }
+
+    private func bindingForAuthJSON(_ cfg: InjectionConfiguration) -> Binding<String> {
+        Binding(
+            get: { cfg.authJSON },
+            set: { newValue in
+                var copy = cfg
+                copy.authJSON = newValue
+                appLayer.updateConfiguration(copy)
+            }
+        )
+    }
+
+    private func bindingForConfigTOML(_ cfg: InjectionConfiguration) -> Binding<String> {
+        Binding(
+            get: { cfg.configTOML },
+            set: { newValue in
+                var copy = cfg
+                copy.configTOML = newValue
+                appLayer.updateConfiguration(copy)
+            }
+        )
+    }
+
+    private func revertLabel(_ cfg: InjectionConfiguration) {
+        var copy = cfg
+        copy.label = initialLabel
+        appLayer.updateConfiguration(copy)
+    }
+
+    private func revertProvider(_ cfg: InjectionConfiguration) {
+        var copy = cfg
+        copy.providerID = initialProviderID
+        appLayer.updateConfiguration(copy)
+    }
 }
-// CodeEditorView 移到了独立文件 CodeEditorView.swift（NSTextView + NSAttributedString 语法高亮 + 行号 ruler + 浅灰主题 + 外框）
