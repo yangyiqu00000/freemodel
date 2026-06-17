@@ -91,10 +91,10 @@ final class FreeModelWebLoginWindowController: NSObject, NSWindowDelegate, WKNav
 
     private func startCookieSync() {
         syncTimer?.invalidate()
+        // 类标了 @MainActor，Timer.scheduledTimer 也在主 runloop 上调度，闭包内直接调用即可，
+        // 不需要再包一层 Task @MainActor。
         syncTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.syncCookies()
-            }
+            self?.syncCookies()
         }
     }
 
