@@ -405,7 +405,7 @@ struct MenuContent: View {
                     Text("监听地址:")
                         .font(.app(.microTag))
                         .foregroundStyle(.secondary)
-                    Text("http://127.0.0.1:\(String(settings.port))/v1")
+                    Text(routerBaseURL(settings.port))
                         .font(.app(.microTag))
                         .foregroundStyle(.blue)
                 }
@@ -426,7 +426,7 @@ struct MenuContent: View {
                 
                 if routerManager.status == .running {
                     Button(action: {
-                        ClipboardHelper.shared.copy("http://127.0.0.1:\(settings.port)/v1")
+                        ClipboardHelper.shared.copy(routerBaseURL(settings.port))
                     }) {
                         Image(systemName: "doc.on.doc.fill")
                             .font(.app(.microTag))

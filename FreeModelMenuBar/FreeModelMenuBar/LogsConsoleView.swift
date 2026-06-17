@@ -26,7 +26,7 @@ struct LogsConsoleView: View {
                 if let activeAccount = accountManager.activeAccount {
                     let isRunning = routerManager.status == .running
                     let portVal = activeAccount.activeRouterSettings.port
-                    let urlString = "http://127.0.0.1:\(portVal)/v1"
+                    let urlString = routerBaseURL(portVal)
                     Button(action: {
                         ClipboardHelper.shared.copy(urlString)
                         showToast("Base URL 已复制", at: $baseURLCopiedToast)
@@ -58,7 +58,7 @@ struct LogsConsoleView: View {
                             Text("监听")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                            Text("http://127.0.0.1:\(settings.port)/v1")
+                            Text(routerBaseURL(settings.port))
                                 .font(.system(.caption, design: .monospaced))
                                 .textSelection(.enabled)
                         }

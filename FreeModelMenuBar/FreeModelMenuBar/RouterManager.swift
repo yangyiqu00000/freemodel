@@ -11,6 +11,11 @@ import Network
 import AppKit
 import SwiftUI
 
+// 本地路由代理的 OpenAI 兼容 base URL（4 处共用：MenuContent × 2 / LogsConsoleView / RouterManager 启动日志）
+func routerBaseURL(_ port: Int) -> String {
+    "http://127.0.0.1:\(port)/v1"
+}
+
 enum RouterStatus: String, Codable, CaseIterable {
     case off = "已关闭"
     case starting = "启动中..."
@@ -392,7 +397,7 @@ final class RouterManager: ObservableObject {
                 self?.performHealthCheckRequest(port: port) { success in
                     if success {
                         self?.status = .running
-                        self?.appendLog("路由代理启动成功！监听地址: http://127.0.0.1:\(port)/v1")
+                        self?.appendLog("路由代理启动成功！监听地址: (routerBaseURL(port))")
                         self?.healthCheckTimer?.cancel()
                     }
                 }
