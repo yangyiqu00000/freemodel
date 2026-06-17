@@ -282,11 +282,7 @@ class BalanceManager: ObservableObject {
             throw FreeModelError.invalidResponse
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 15
+        let request = Self.makeAuthorizedRequest(url: url, apiKey: apiKey, acceptJSON: true)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -318,10 +314,7 @@ class BalanceManager: ObservableObject {
             throw FreeModelError.invalidResponse
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 15
+        let request = Self.makeAuthorizedRequest(url: url, apiKey: apiKey, acceptJSON: false)
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -337,6 +330,19 @@ class BalanceManager: ObservableObject {
         default:
             throw FreeModelError.serverError(httpResponse.statusCode, "验证失败")
         }
+    }
+
+
+    /// 构造带 Bearer Token 的 GET 请求。3 个 endpoint 查询共用，统一 timeout 与 header。
+    private static func makeAuthorizedRequest(url: URL, apiKey: String, acceptJSON: Bool) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if acceptJSON {
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+        }
+        request.timeoutInterval = 15
+        return request
     }
 
     private func balanceEndpoints(for account: ProviderAccount) -> [String] {
