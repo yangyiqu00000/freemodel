@@ -229,6 +229,7 @@ private enum AddKind { case account, codex }
             }
         }
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .frame(width: 720, height: 620)
         .onAppear {
             if let activeID = accountManager.activeAccountID {

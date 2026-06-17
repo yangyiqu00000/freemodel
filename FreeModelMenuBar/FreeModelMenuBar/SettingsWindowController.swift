@@ -42,6 +42,13 @@ final class SettingsWindowController {
         newWindow.isReleasedWhenClosed = false
         newWindow.level = .floating
         newWindow.minSize = NSSize(width: 640, height: 520)
+        // 强制 light appearance —— 修复 Codex 注入页"全黑看不见"问题：
+        // SwiftUI 嵌在 NSWindow 里时，详情区未设显式 background 会透出 NSWindow 底色；
+        // dark mode 下底色近黑，导致整个详情区看上去全黑。锁 light 后浅灰底稳定可见。
+        newWindow.appearance = NSAppearance(named: .aqua)
+        // 同步给 hosting view 一个兜底底色（SwiftUI 内未设 background 的子视图会透出它）
+        hostingController.view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        hostingController.view.wantsLayer = true
 
         newWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
