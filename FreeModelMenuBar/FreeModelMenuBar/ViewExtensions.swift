@@ -148,3 +148,22 @@ extension Font {
         return base
     }
 }
+
+// MARK: - Toast 自动消失任务（3 处 view 共用：SettingsView / LogsConsoleView / SettingsSidebarView）
+//
+// 旧 toast 会被新 toast 取消（防过期复活），value=nil 不会启动计时器。
+// 接受 Binding<T?> 写入值；用 @MainActor 隔离避免跨线程更新 binding。
+@discardableResult
+func scheduleToastDismiss<T: Equatable>(
+    value: T?,
+    binding: Binding<T?>,
+    seconds: Double = 3.0
+) -> Task<Void, Never>? {
+    withAnimation { binding.wrappedValue = value }
+    guard value != nil else { return nil }
+    return Task { @MainActor in
+        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        guard !Task.isCancelled else { return }
+        withAnimation { binding.wrappedValue = nil }
+    }
+}

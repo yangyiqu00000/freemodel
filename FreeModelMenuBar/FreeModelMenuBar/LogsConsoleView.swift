@@ -212,12 +212,6 @@ struct LogsConsoleView: View {
 
     private func showToast<T: Equatable>(_ value: T?, at binding: Binding<T?>, seconds: Double = 3.0) {
         toastTask?.cancel()
-        withAnimation { binding.wrappedValue = value }
-        guard value != nil else { return }
-        toastTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            withAnimation { binding.wrappedValue = nil }
-        }
+        toastTask = scheduleToastDismiss(value: value, binding: binding, seconds: seconds)
     }
 }
