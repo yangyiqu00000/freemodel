@@ -32,6 +32,7 @@ struct CodexInjectionSettingsView: View {
 
     // "已自动保存"反馈
     @State private var autoSavedAt: Date? = nil
+    @State private var clearSavedTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -324,7 +325,13 @@ struct CodexInjectionSettingsView: View {
     }
 
     private func triggerAutoSaveToast() {
+        clearSavedTask?.cancel()
         autoSavedAt = Date()
+        clearSavedTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            autoSavedAt = nil
+        }
     }
 
     private static let autoSavedTimeFormatter: DateFormatter = {
