@@ -414,9 +414,14 @@ public final class AppLayer: ObservableObject {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    private static func shortNow() -> String {
+    // DateFormatter 自 macOS 10.9 起线程安全，可作为 static let 复用避免每次新建。
+    private static let shortNowFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMdd-HHmm"
-        return f.string(from: Date())
+        return f
+    }()
+
+    private static func shortNow() -> String {
+        Self.shortNowFormatter.string(from: Date())
     }
 }

@@ -303,10 +303,16 @@ struct SettingsSidebarView: View {
         }
     }
 
-    private static func shortNow() -> String {
+    // MMdd-HHmm 格式的时间戳短串（添加账号/Codex 配置时的默认名后缀）。
+    // DateFormatter 自 macOS 10.9 起线程安全，可作为 static let 复用避免每次新建。
+    private static let shortNowFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMdd-HHmm"
-        return f.string(from: Date())
+        return f
+    }()
+
+    private static func shortNow() -> String {
+        Self.shortNowFormatter.string(from: Date())
     }
 
     private func shortNow() -> String { Self.shortNow() }
