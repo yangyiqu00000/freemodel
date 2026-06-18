@@ -20,19 +20,20 @@ struct MenuContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏：图标 + 标题 + 副标题（账号 / Codex 注入统计）
-            HStack(alignment: .center, spacing: Spacing.standard) {
-                Image(systemName: "dollarsign.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.blue)
-                VStack(alignment: .leading, spacing: 1) {
+            // 标题栏：图标 + FreeModel + 账号数 + 当前账号（两端对齐）
+            HStack(alignment: .center) {
+                HStack(spacing: Spacing.standard) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.blue)
                     Text("FreeModel")
                         .font(.headline)
-                    Text(headerSubtitle)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
+                Spacer()
+                Text(headerSubtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Spacer()
                 if let activeAccount = accountManager.activeAccount {
                     Text(activeAccount.displayName)
@@ -135,8 +136,7 @@ struct MenuContent: View {
 
     private var headerSubtitle: String {
         let accountCount = accountManager.accounts.count
-        let accountPart = accountCount == 0 ? "无账号" : "\(accountCount) 个账号"
-        return "v1 · \(accountPart)"
+        return accountCount == 0 ? "无账号" : "\(accountCount) 个账号"
     }
 
     // MARK: - 子视图
