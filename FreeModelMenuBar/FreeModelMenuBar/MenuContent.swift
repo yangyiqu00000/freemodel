@@ -387,18 +387,12 @@ struct MenuContent: View {
                 }
                 Spacer()
                 
-                Button(action: {
-                    routerManager.toggleRouter()
-                }) {
-                    Text(settings.enabled ? "停止" : "启动")
-                        .font(.app(.microLabel))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.standard)
-                        .padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(settings.enabled ? Color.red : Color.blue))
-                }
-                .buttonStyle(.plain)
-                .disabled(!account.hasAPIKey)
+                RouterToggle(isOn: settings.enabled)
+                    .opacity(account.hasAPIKey ? 1 : 0.4)
+                    .onTapGesture {
+                        guard account.hasAPIKey else { return }
+                        routerManager.toggleRouter()
+                    }
                 
                 if routerManager.status.isRunning {
                     Button(action: {
@@ -477,5 +471,24 @@ private struct AccountMenuRow: View {
         if isActive { return Color.accentFill }
         if isHovered { return Color.secondary.opacity(0.10) }
         return Color.clear
+    }
+}
+
+// MARK: - 路由开关滑块
+
+private struct RouterToggle: View {
+    let isOn: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? Color.green : Color.red)
+            .frame(width: 36, height: 18)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(.white)
+                    .frame(width: 14, height: 14)
+                    .padding(2)
+            }
+            .animation(.easeInOut(duration: 0.2), value: isOn)
     }
 }
