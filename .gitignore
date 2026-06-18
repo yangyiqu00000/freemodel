@@ -12,6 +12,7 @@ xcuserdata/
 # 构建产物(嵌入在子项目中)
 FreeModelMenuBar/build/
 FreeModelMenuBar/DerivedData/
+FreeModelMenuBar/.build/
 
 # macOS 系统文件
 .DS_Store
@@ -40,5 +41,9 @@ yarn-error.log*
 
 # Codex 桌面会话临时文件
 HANDOFF_NEXT.md
-HANDOFF_*.md
+HANDOFF*.md
 FreeModelMenuBar/build_manual/
+
+# 打包产物 (DMG 等本地构建结果,不入库)
+dist/
+*.dmg
