@@ -42,7 +42,7 @@ struct LogsConsoleView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             Text(routerBaseURL(settings.port))
-                                .font(.system(.caption, design: .monospaced))
+                                .font(.app(.monoCaption))
                                 .textSelection(.enabled)
                         }
                         VStack(alignment: .leading, spacing: 2) {
@@ -50,7 +50,7 @@ struct LogsConsoleView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             Text(settings.upstreamBaseURL)
-                                .font(.system(.caption, design: .monospaced))
+                                .font(.app(.monoCaption))
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .textSelection(.enabled)
@@ -100,7 +100,7 @@ struct LogsConsoleView: View {
                     LazyVStack(alignment: .leading, spacing: Spacing.tight) {
                         if routerManager.logs.isEmpty {
                             Text("无日志数据")
-                                .font(.system(.caption, design: .monospaced))
+                                .font(.app(.monoCaption))
                                 .foregroundStyle(.gray)
                                 .padding(.vertical, Spacing.standard)
                         } else {

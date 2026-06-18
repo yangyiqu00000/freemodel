@@ -170,6 +170,8 @@ enum AppFont {
     case microTag
     /// 12pt monospaced 编辑器正文
     case editorBody
+    /// 11pt monospaced 控制台日志行（匹配 .system(.caption, design: .monospaced) macOS 原生大小）
+    case monoCaption
     /// 10pt monospaced 日志行
     case logMono
     /// 14pt 侧栏小图标
@@ -189,6 +191,8 @@ extension Font {
             base = .system(size: 10 * appFontScale, weight: .regular, design: .default)
         case .editorBody:
             base = .system(size: 12 * appFontScale, weight: .regular, design: .monospaced)
+        case .monoCaption:
+            base = .system(size: 11 * appFontScale, weight: .regular, design: .monospaced)
         case .logMono:
             base = .system(size: 10 * appFontScale, weight: .regular, design: .monospaced)
         case .sidebarIcon:

@@ -29,4 +29,6 @@ extension Color {
         let isDark = appearance.name == .darkAqua || appearance.name == .vibrantDark
         return NSColor(white: isDark ? 0.18 : 0.08, alpha: 1.0)
     }))
+
+    static let progressTrack = Color.gray.opacity(0.20)
 }
