@@ -2,12 +2,12 @@
 
 # 💲 FreeModel MenuBar
 
-**Stop hand-editing `~/.codex/config.toml` every time you switch API keys.**
+**One tiny macOS menu bar app. Three headaches gone.**
 
-A tiny macOS menu bar app that lets you rotate LLM providers inside
-[OpenAI Codex](https://github.com/openai/codex) with one click — and ships
-with a built-in local router that fixes the protocol quirks nobody
-warned you about.
+> Stop hand-editing `~/.codex/config.toml`. Stop wondering how much
+> credit you have left. Stop restarting Codex just to switch keys.
+
+[English](README.md) · [中文](README.zh.md)
 
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue?logo=apple)](#-system-requirements)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange?logo=swift)](#-tech-stack)
@@ -15,84 +15,131 @@ warned you about.
 [![Release](https://img.shields.io/github/v/release/yangyiqu00000/freemodel)](https://github.com/yangyiqu00000/freemodel/releases)
 [![Stars](https://img.shields.io/github/stars/yangyiqu00000/freemodel?style=social)](https://github.com/yangyiqu00000/freemodel)
 
-[⬇️ Download v0.0.1](https://github.com/yangyiqu00000/freemodel/releases/latest) · [📖 中文文档](FreeModelMenuBar/README.md) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
+[⬇️ Download v0.0.1](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
 
 </div>
 
 ---
 
-## ✨ What is this?
+## ✨ Why FreeModel MenuBar?
 
-You're juggling three API keys. Maybe four. You've got FreeModel, DeepSeek,
-OpenRouter, ModelScope… and every time you want to test a prompt with
-provider X, the ritual looks like this:
+If you use [OpenAI Codex](https://github.com/openai/codex) with anything
+other than the official OpenAI endpoint, you've been through this loop:
 
-```bash
+```text
 vim ~/.codex/config.toml   # edit provider, paste key, change base_url
 codex                      # restart
 # test
-vim ~/.codex/config.toml   # again
-codex                      # again
+vim ~/.codex/config.toml   # edit again
+codex                      # restart again
+# ... and your balance? who knows.
 ```
 
-**No more.**
+**FreeModel MenuBar replaces that whole ritual with a click in the menu bar.**
 
-FreeModel MenuBar lives in your menu bar (look for the 💲). Click it,
-pick an account, done. Your `config.toml` is rewritten for you, the
-local router reloads, and Codex is none the wiser.
-
-> 🪄 It's the missing "settings UI" Codex never had.
+It's deliberately small. It's not a proxy manager, not an IDE, not a CLI
+replacement. It's a **status-bar switchboard** for Codex — three things,
+done well.
 
 ---
 
-## 🎯 Features you'll actually use
+## 🎯 The three things it does
 
-### 🔁 Multi-account switching that doesn't suck
-- **Unlimited accounts** — every provider, every key, in one place
-- **One-click rotation** — pick an account from the menu, that's it
-- **Keychain-backed** — your keys never touch a plaintext file
-- **Two refresh modes**:
-  - 🌐 *Web console mode*: scrapes your dashboard via a sandboxed WebKit
-    window — no API key needed
-  - 🔑 *API mode*: fast balance check via the provider's billing endpoint
+### 1. 🌐 Unify every API into the Responses protocol
 
-### 📊 Status bar that actually tells you something
-- Color-coded balance (🟢 healthy → 🟠 low → 🔴 critical)
+Codex speaks the **OpenAI Responses** API. Most third-party providers
+only speak **Chat Completions** (or, increasingly, their own thing).
+
+The app ships a tiny local router that **transparently translates
+anything into Responses**. Add a provider, set its real base URL once,
+and the router does the rest.
+
+The magic consequence: in `~/.codex/config.toml`, you only ever write
+**one** `base_url`:
+
+```toml
+base_url = "http://127.0.0.1:7842/v1"
+```
+
+That's it. Forever. Even if you switch from DeepSeek to OpenRouter to
+some random gateway, **Codex never sees a different URL.**
+
+> 🪄 Configure once. The rest is menu-bar clicks.
+
+### 2. 🔁 Hot-swap accounts without restarting Codex
+
+Click the 💲 icon → pick an account → **the switch happens live.**
+
+- The router reloads its upstream config
+- Codex keeps streaming; in-flight requests aren't disturbed
+- No `killall codex`, no `codex` re-launch, no lost context
+
+This is the whole point. The old workflow forced you to restart Codex
+because `config.toml` was the source of truth. With the local router as
+a stable middleman, **Codex is decoupled from the provider layer.**
+
+> 🧘 Test three providers in a row without losing your place.
+
+### 3. 💰 See your balance right in the menu bar
+
+No more logging into dashboards. No more "is it $5 or $0.50 left?"
+
+- 🟢 Healthy / 🟠 Low / 🔴 Critical — color-coded at a glance
 - Custom alert thresholds per provider
-- Live balance & quota right in the menu bar icon
+- Auto-refresh on a schedule you control
+- Click the menu bar item for a per-account breakdown
 
-### ⚡ Built-in local router (the part nobody asked for, but everybody needs)
+The router is local, but the **balance check** can hit each provider's
+billing endpoint (or, for providers without one, scrape the dashboard
+in a sandboxed WebKit window — your key never leaves your machine).
 
-Spin up a local Node.js sidecar that exposes a **OpenAI-compatible
-endpoint at `http://127.0.0.1:<port>/v1`**. Why? Because Codex uses
-the Responses API, and most third-party providers only speak
-Chat Completions. The router fixes that, transparently:
+> 😌 Quiet the "do I have enough credit?" anxiety.
 
-| Headache | What the router does |
-|---|---|
-| `unknown variant developer` (Responses → Chat) | Auto-maps `developer` → `system` |
-| Client aborts mid-stream | Tears down the upstream TCP so you don't get billed for the rest |
-| Provider returns plain error JSON | Wraps it in a proper `event: response.failed` SSE |
-| Non-OpenAI base URLs | Just works — point Codex at `127.0.0.1` and forget |
+---
 
-> Zero npm dependencies. The entire router is plain `node:http` +
-> `node:https`. Runs out of the box.
+## 🧩 The three setups it covers
 
-### 🛠️ Developer-grade console
-- Dark-themed rolling log of the last 50 requests
-- Click any row to see the full request/response
-- Quick links to each provider's console & API docs
+The app doesn't try to be a kitchen sink. It supports **exactly three
+configurations**, which together cover every way people use Codex:
 
-### 🧘 Designed not to wake you up
-- Listens to `NSWorkspace.didWakeNotification` — if your Mac sleeps,
-  the router health-checks itself on wake and **hot-restarts if it died**
-- No background daemons, no launchctl, no mystery ports left open
+| Setup | When to use it | `base_url` in `config.toml` | Router runs? |
+|---|---|---|---|
+| **A. Third-party + Responses conversion** | You're using DeepSeek / OpenRouter / ModelScope / any non-OpenAI Chat-Completions provider | `http://127.0.0.1:<port>/v1` | ✅ Yes |
+| **B. Third-party, native Responses** | Provider already speaks Responses natively | `http://127.0.0.1:<port>/v1` | ⚪ Optional pass-through |
+| **C. Official OpenAI** | You're using OpenAI directly | The provider's own `https://api.openai.com/v1` | ❌ No — read config directly |
+
+**That's the entire surface area.** Three modes, mutually exclusive
+in any given moment, switchable with one click.
+
+> The router is opt-in: if you don't need protocol translation, you
+> don't pay for it. The menu bar app works on its own — it can just
+> read the official OpenAI config straight from `~/.codex/config.toml`
+> and show you balance, no router, no Node, nothing extra running.
+
+---
+
+## 🚀 Quick start (90 seconds)
+
+```text
+   ┌──────────────────────────────────────────────────────────┐
+   │  1. Install FreeModelMenuBar (DMG, drag to /Applications)│
+   │  2. Click 💲 in the menu bar → Settings                  │
+   │  3. Add an account (paste API key, pick provider)        │
+   │  4. Pick your setup:                                     │
+   │       A) Third-party → router ON  → done                 │
+   │       B) Third-party native → router pass-through → done  │
+   │       C) Official OpenAI  → no router, just balance      │
+   │  5. In Codex config.toml, set base_url to                │
+   │       http://127.0.0.1:<port>/v1   (one time, ever)      │
+   │  6. From now on: click 💲 → switch account → it just works│
+   └──────────────────────────────────────────────────────────┘
+```
+
+After step 5, you'll never touch `config.toml` again.
 
 ---
 
 ## 📦 Install
-
-You have two options. Pick the one that hurts less.
 
 ### Option A: Grab the DMG (recommended)
 
@@ -100,15 +147,12 @@ You have two options. Pick the one that hurts less.
 2. Download `FreeModelMenuBar-0.0.1.dmg`
 3. Open it, drag the app into `/Applications`
 4. Launch it — look for 💲 in your menu bar
-5. Click 💲 → **Settings** → add your first account
 
 > **First-launch tip:** if macOS Gatekeeper complains, right-click
-> the app in Finder → **Open** → **Open** again. This is a one-time
-> thing for ad-hoc-signed apps.
+> the app in Finder → **Open** → **Open** again. One-time thing for
+> ad-hoc-signed apps.
 
 ### Option B: Build it yourself
-
-You only need this if you want to hack on the code.
 
 ```bash
 git clone https://github.com/yangyiqu00000/freemodel.git
@@ -117,30 +161,59 @@ cd freemodel/FreeModelMenuBar
 ```
 
 The script compiles, ad-hoc signs, and drops a fresh
-`FreeModelMenuBar.app` on your Desktop. Done.
+`FreeModelMenuBar.app` on your Desktop.
 
-**Requirements:** macOS 13+, Xcode 15+, Node 16+ (only if you use the
-local router feature — the menu bar app itself is pure Swift).
-
----
-
-## 🚀 Quick start
-
-```text
-   ┌──────────────────────────────────────────────────────────┐
-   │  1. Open FreeModelMenuBar (💲 in menu bar)               │
-   │  2. Settings → Accounts → +  (add your API key)          │
-   │  3. Settings → Router  → Enable (toggle on)             │
-   │  4. In Codex: set base_url to http://127.0.0.1:<port>   │
-   │  5. Back in 💲 menu, click your account name → done      │
-   └──────────────────────────────────────────────────────────┘
-```
-
-That's the whole flow. Now go burn your `config.toml` backups.
+**Requirements:** macOS 13+, Xcode 15+, Node 16+ (only needed for
+**Setup A** — the menu bar app and Setups B/C work fine without it).
 
 ---
 
-## 🧩 Tech stack
+## ❓ FAQ
+
+**Q: Is this safe? You're rewriting my `config.toml` for me.**
+A: The app reads & writes `~/.codex/config.toml` directly. We never
+   send it anywhere. The only network calls are to the providers you
+   explicitly add. Source is 100% Swift — go read it.
+
+**Q: Why do I need a local router? Can't Codex just use the right base URL?**
+A: Two reasons:
+   1. Codex uses Responses; most providers use Chat Completions. The
+      router bridges that locally — no third-party proxy, no data
+      leaves your machine except the upstream call you asked for.
+   2. Decoupling. With the router as a stable middleman, **Codex
+      never has to know which provider you're using.** You switch
+      providers via the menu bar; the router swaps its upstream.
+
+**Q: Does Setup A work with my favorite provider X?**
+A: If it speaks OpenAI Chat Completions (most do), yes. The router
+   does the protocol translation, plus a few quality-of-life fixes:
+   - Maps `developer` role → `system` (some providers choke on `developer`)
+   - Wraps plain errors in `event: response.failed` SSE
+   - Tears down the upstream TCP when you stop generating (no silent
+     token drain)
+
+**Q: What if I just use official OpenAI?**
+A: Use **Setup C**. The menu bar app reads your existing
+   `~/.codex/config.toml` and shows balance. No router, no Node,
+   no extra processes.
+
+**Q: Does it work on Apple Silicon? Intel?**
+A: Both. Universal binary (`x86_64 arm64`).
+
+**Q: Will this work with Cursor / Claude Code / Aider?**
+A: For Cursor: yes, point its OpenAI base URL at the local router.
+   For the others: they don't use Codex's Responses API, so the
+   "unified base URL" trick doesn't apply — but Setup C (balance
+   monitoring) still works.
+
+**Q: Why ad-hoc signing? Can I notarize?**
+A: Ad-hoc is fine for personal use and casual sharing. Notarization
+   needs a $99/year Apple Developer account — happy to set it up
+   if there's demand.
+
+---
+
+## 🧪 Tech stack
 
 | Layer | What we use | Why |
 |---|---|---|
@@ -159,7 +232,7 @@ FreeModelMenuBar/
 │   │   ├── AuthLayer/       # Keychain + JSON store
 │   │   ├── ConfigLayer/     # TOML read/write (no TOMLKit dep)
 │   │   └── ProviderLayer/   # Catalog & presets
-│   ├── router_sidecar.js    # The local Responses → Chat router
+│   ├── router_sidecar.js    # The local Responses ↔ Chat router
 │   ├── MenuContent.swift    # The 💲 menu you actually see
 │   └── ...
 ├── scripts/                 # Static checks for the router
@@ -167,52 +240,27 @@ FreeModelMenuBar/
 └── build.sh                 # One-shot build → ad-hoc sign → desktop
 ```
 
-For the full feature list (in Chinese), see
-[`FreeModelMenuBar/README.md`](FreeModelMenuBar/README.md).
-
----
-
-## ❓ FAQ
-
-**Q: Is this safe? You're rewriting my `config.toml` for me.**
-A: The app reads & writes `~/.codex/config.toml` directly. We never
-   send it anywhere. The only network calls are to the providers you
-   explicitly add. Source is 100% Swift — go read it.
-
-**Q: Why a router? Can't Codex just use the right base URL?**
-A: Codex speaks the Responses API. Most third-party providers
-   only support Chat Completions. The router bridges that gap
-   *locally* — no third-party proxy, no data leaves your machine
-   except the upstream call you asked for.
-
-**Q: Does it work on Apple Silicon? Intel?**
-A: Both. Universal binary (`x86_64 arm64`).
-
-**Q: Why is the signing "ad-hoc"? Can I notarize it?**
-A: Ad-hoc is fine for personal use and casual sharing. Notarization
-   needs a $99/year Apple Developer account — happy to set it up
-   if there's demand.
-
-**Q: Will this work with Claude Code / Cursor / Aider?**
-A: Anything that speaks OpenAI Chat Completions or Responses works.
-   Point `base_url` at the local router and you're set.
-
-**Q: My provider isn't in the catalog.**
-A: Settings → Providers → **+** → add a custom base URL, model name,
-   and API key. Works with any OpenAI-compatible endpoint.
-
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Multi-account rotation
-- [x] Local Responses → Chat router
+Already shipped:
+
+- [x] Multi-account rotation, hot-swap, no restart
+- [x] Three-mode setup (router / pass-through / official)
+- [x] Local Responses ↔ Chat Completions router
 - [x] Wake-from-sleep auto-heal
 - [x] Keychain-backed credential storage
-- [ ] Configurable rate limit / retry budget per provider
-- [ ] Per-account model aliases (`/v1/models/gpt-4` → upstream's `gpt-4-turbo`)
-- [ ] Token-usage analytics (last 7 / 30 days)
-- [ ] Menubar icon theming
+- [x] Menu-bar balance monitoring with color-coded alerts
+
+Coming next:
+
+- [ ] **Per-provider usage tutorials** — guided first-run walkthroughs
+      for each of Setup A / B / C, with screenshots
+- [ ] **More third-party provider support** in the catalog
+- [ ] **Customizable API quota refresh interval** per provider
+- [ ] **Per-account model aliases** (`/v1/models/gpt-4` → upstream's `gpt-4-turbo`)
+- [ ] **Token-usage analytics** (last 7 / 30 days)
 - [ ] Notarized build (waiting on Apple Dev account — see FAQ)
 
 PRs welcome. Issues are open. Star the repo if this saved you a `vim`.
