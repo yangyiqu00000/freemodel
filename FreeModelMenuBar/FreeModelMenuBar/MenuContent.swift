@@ -377,7 +377,7 @@ struct MenuContent: View {
             }
             
             HStack {
-                VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
                     Text("监听地址:")
                         .font(.app(.microTag))
                         .foregroundStyle(.secondary)
