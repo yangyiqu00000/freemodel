@@ -20,26 +20,30 @@ struct MenuContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏：图标 + FreeModel + 账号数 + 当前账号（两端对齐）
-            HStack(alignment: .center) {
-                HStack(spacing: Spacing.standard) {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
-                    Text("FreeModel")
-                        .font(.headline)
+            // 标题栏：左(Logo+FreeModel) / 中(账号数) / 右(当前账号) 独立定位
+            ZStack {
+                HStack {
+                    HStack(spacing: Spacing.standard) {
+                        Image(systemName: "dollarsign.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.blue)
+                        Text("FreeModel")
+                            .font(.headline)
+                    }
+                    Spacer()
                 }
-                Spacer()
                 Text(headerSubtitle)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Spacer()
-                if let activeAccount = accountManager.activeAccount {
-                    Text(activeAccount.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                HStack {
+                    Spacer()
+                    if let activeAccount = accountManager.activeAccount {
+                        Text(activeAccount.displayName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
             .padding(.horizontal, Spacing.loose)
