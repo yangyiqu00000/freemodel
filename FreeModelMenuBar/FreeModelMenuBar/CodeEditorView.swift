@@ -2,10 +2,7 @@
 //  CodeEditorView.swift
 //  FreeModelMenuBar
 //
-//  代码编辑器 — 1:1 复用 logsConsoleSection 的"黑底 + 圆角 + 可选"形式。
-//  logsConsoleSection 用的就是：ScrollView { LazyVStack { ... } }.background(Color.black).cornerRadius(6).textSelection(.enabled)
-//  这里底层用 TextEditor 替代 LazyVStack（带内置滚动，所以去掉外层 ScrollView）。
-//  关键：.background(Color.black) 必须直接挂到 TextEditor 自身，否则看不到黑底。
+//  代码编辑器 — logsConsoleSection 同款样式（黑底 + 圆角 + 可选），背景色跟随系统外观自适应。
 //
 
 import SwiftUI
@@ -27,10 +24,10 @@ struct CodeEditorView: View {
             .font(.app(.editorBody))
             .foregroundStyle(.white)
             .scrollContentBackground(.hidden)
-            .padding(8)
+            .padding(Spacing.standard)
             .frame(minHeight: minHeight, idealHeight: idealHeight, maxHeight: maxHeight)
-            .background(Color.black)        // 与 logsConsoleSection 一致
-            .cornerRadius(6)                // 与 logsConsoleSection 一致
-            .textSelection(.enabled)        // 与 logsConsoleSection 一致
+            .background(Color.codeBackground)
+            .cornerRadius(6)
+            .textSelection(.enabled)
     }
 }

@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+/// 菜单栏下拉面板尺寸 token——避免 320pt 写死散落
+private enum MenuMetrics {
+    /// 菜单理想宽度（macOS 菜单栏 popup 稳定尺寸）
+    static let menuWidth: CGFloat = 320
+}
+
 struct MenuContent: View {
     @EnvironmentObject var accountManager: AccountManager
     @EnvironmentObject var balanceManager: BalanceManager
@@ -15,7 +21,7 @@ struct MenuContent: View {
     var body: some View {
         VStack(spacing: 0) {
             // 标题栏：图标 + 标题 + 副标题（账号 / Codex 注入统计）
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: Spacing.standard) {
                 Image(systemName: "dollarsign.circle.fill")
                     .font(.title2)
                     .foregroundStyle(.blue)
@@ -35,9 +41,9 @@ struct MenuContent: View {
                         .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.horizontal, Spacing.loose)
+            .padding(.top, Spacing.relaxed)
+            .padding(.bottom, Spacing.standard)
 
             if accountManager.accounts.count > 1 {
                 sectionDivider()
@@ -71,7 +77,7 @@ struct MenuContent: View {
             sectionDivider()
 
             // 操作按钮
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.relaxed) {
                 Button(action: {
                     Task { await balanceManager.fetchBalance() }
                 }) {
@@ -100,8 +106,8 @@ struct MenuContent: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Spacing.loose)
+            .padding(.vertical, Spacing.standard)
             .controlSize(.small)
             .buttonStyle(.bordered)
 
@@ -119,10 +125,10 @@ struct MenuContent: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.loose)
+            .padding(.vertical, Spacing.relaxed)
         }
-        .frame(width: 320)
+        .frame(width: MenuMetrics.menuWidth)
     }
 
     // MARK: - 标题栏副标题
@@ -136,7 +142,7 @@ struct MenuContent: View {
     // MARK: - 子视图
 
     private var accountSwitcher: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
             Text("账号")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -173,7 +179,7 @@ struct MenuContent: View {
                                 .foregroundStyle(balance.isLow ? .orange : .green)
                         }
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Spacing.standard)
                     .padding(.vertical, 6)
                     .contentShape(Rectangle())
                     .background(
@@ -184,12 +190,12 @@ struct MenuContent: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.loose)
         .padding(.vertical, 10)
     }
 
     private var noAccountView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.relaxed) {
             Image(systemName: "person.crop.circle.badge.plus")
                 .font(.app(.displayNumber))
                 .foregroundStyle(.orange)
@@ -202,11 +208,11 @@ struct MenuContent: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(24)
+        .padding(Spacing.section)
     }
 
     private var unconfiguredView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.relaxed) {
             if let account = accountManager.activeAccount {
                 if account.queryMode == .dashboard {
                     Image(systemName: "person.crop.circle.badge.exclamationmark")
@@ -239,13 +245,13 @@ struct MenuContent: View {
                 noAccountView
             }
         }
-        .padding(24)
+        .padding(Spacing.section)
     }
 
     private func balanceDetailView(balance: BalanceInfo) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.loose) {
             // 余额显示
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.tight) {
                 Text("剩余额度")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -264,7 +270,7 @@ struct MenuContent: View {
                         .foregroundStyle(.red)
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, Spacing.standard)
 
             // 使用进度条
             VStack(alignment: .leading, spacing: 6) {
@@ -320,23 +326,23 @@ struct MenuContent: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.loose)
+        .padding(.vertical, Spacing.standard)
     }
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.relaxed) {
             ProgressView()
                 .scaleEffect(1.2)
             Text("正在查询余额...")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(24)
+        .padding(Spacing.section)
     }
 
     private var errorView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.relaxed) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.red)
@@ -353,7 +359,7 @@ struct MenuContent: View {
             }
             .buttonStyle(.bordered)
         }
-        .padding(24)
+        .padding(Spacing.section)
     }
 
     // MARK: - 辅助方法
@@ -417,7 +423,7 @@ struct MenuContent: View {
                     Text(settings.enabled ? "停止" : "启动")
                         .font(.app(.microLabel))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, Spacing.standard)
                         .padding(.vertical, 3)
                         .background(RoundedRectangle(cornerRadius: 3).fill(settings.enabled ? Color.red : Color.blue))
                 }
@@ -433,14 +439,14 @@ struct MenuContent: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .padding(.leading, 4)
+                    .padding(.leading, Spacing.tight)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.relaxed)
+        .padding(.vertical, Spacing.standard)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.08)))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 4)
+        .padding(.horizontal, Spacing.loose)
+        .padding(.bottom, Spacing.tight)
     }
 }

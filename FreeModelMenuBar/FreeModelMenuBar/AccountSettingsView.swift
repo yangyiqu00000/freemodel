@@ -113,7 +113,7 @@ struct AccountSettingsView: View {
                 .disabled(trimmedRenameText.isEmpty)
                 if trimmedRenameText != initialDisplayName
                     && !trimmedRenameText.isEmpty {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.tight) {
                         Image(systemName: "circle.dashed")
                             .foregroundStyle(.orange)
                         Text("未保存")
@@ -123,7 +123,7 @@ struct AccountSettingsView: View {
                     .help("尚未保存，点「重命名」或按回车提交")
                 }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.standard) {
                 tag("平台: \(account.displayProviderName)", systemImage: "server.rack")
                 tag(account.hasDashboardSession ? "控制台已登录" : "控制台未登录", systemImage: account.hasDashboardSession ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                 if account.hasAPIKey {
@@ -143,7 +143,7 @@ struct AccountSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.relaxed) {
                 Button("登录当前账号") {
                     FreeModelWebLoginWindowController.shared.openLogin(
                         balanceManager: balanceManager,
@@ -152,14 +152,14 @@ struct AccountSettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
 
                 Button("刷新余额") {
                     Task { await balanceManager.fetchBalance() }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(balanceManager.isLoading)
 
                 Button(role: .destructive) {
@@ -171,12 +171,12 @@ struct AccountSettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .tint(.red)
             }
 
             if let balance = account.lastBalance {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.tight) {
                     HStack {
                         if balance.isLow {
                             Image(systemName: "exclamationmark.triangle.fill")
@@ -210,19 +210,19 @@ struct AccountSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: Spacing.standard) {
+                VStack(alignment: .leading, spacing: Spacing.tight) {
                     if showAPIKey {
                         TextField("sk-...", text: $apiKeyInput)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(.app(.editorBody))
                             .onChange(of: apiKeyInput) { _ in
                                 apiKeyStatus.markUnsavedIfPersisted()
                             }
                     } else {
                         SecureField("sk-...", text: $apiKeyInput)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(.app(.editorBody))
                             .onChange(of: apiKeyInput) { _ in
                                 apiKeyStatus.markUnsavedIfPersisted()
                             }
@@ -230,7 +230,7 @@ struct AccountSettingsView: View {
                     apiKeyStatusBadge
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.tight) {
                     HStack(spacing: 6) {
                         Button(action: { showAPIKey.toggle() }) {
                             Image(systemName: showAPIKey ? "eye.slash" : "eye")
@@ -253,14 +253,14 @@ struct AccountSettingsView: View {
                 }
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.relaxed) {
                 Button("保存") {
                     balanceManager.apiKey = apiKeyInput
                     apiKeyStatus = .saved
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(apiKeyInput.isEmpty)
 
                 Button("测试连接") {
@@ -268,7 +268,7 @@ struct AccountSettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(apiKeyInput.isEmpty || isTesting)
 
                 Button(role: .destructive) {
@@ -281,7 +281,7 @@ struct AccountSettingsView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 .tint(.red)
-                .frame(height: 28)
+                .uniformButtonHeight()
             }
         }
         .sectionPanel()
@@ -292,7 +292,7 @@ struct AccountSettingsView: View {
             Label("快捷链接", systemImage: "link")
                 .font(.headline)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.relaxed) {
                 Button("打开 \(account.displayProviderName) 控制面板") {
                     openURL(account.dashboardURL)
                 }
@@ -387,8 +387,8 @@ struct AccountSettingsView: View {
     private func tag(_ text: String, systemImage: String) -> some View {
         Label(text, systemImage: systemImage)
             .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, Spacing.standard)
+            .padding(.vertical, Spacing.tight)
             .background(Capsule().fill(Color.overlayFill))
     }
 
@@ -401,7 +401,7 @@ struct AccountSettingsView: View {
                 statusDot(color: color, size: 8, help: headerDotHelp(for: title))
             }
         }
-        .padding(.top, 4)
+        .padding(.top, Spacing.tight)
     }
 
     private func headerDotHelp(for title: String) -> String {

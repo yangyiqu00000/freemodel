@@ -213,7 +213,7 @@ struct RouterSettingsView: View {
 
                 Spacer()
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.tight)
 
             // 缺 API Key 提示
             if !hasAPIKey {
@@ -229,7 +229,7 @@ struct RouterSettingsView: View {
                     providerPresetChip(preset: preset)
                 }
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, Spacing.tight)
 
             if editing.enabled {
                 routerFields
@@ -264,14 +264,14 @@ struct RouterSettingsView: View {
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.06)))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.red.opacity(0.3), lineWidth: 1))
-        .padding(.bottom, 4)
+        .padding(.bottom, Spacing.tight)
     }
 
     // MARK: - 路由字段
 
     private var routerFields: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.standard) {
+            HStack(spacing: Spacing.tight) {
                 Text("带")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -285,11 +285,11 @@ struct RouterSettingsView: View {
             }
 
             // 代理设置
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.standard) {
                 Label("代理设置", systemImage: "network")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.relaxed) {
                     requiredRouterField(
                         label: "本地代理端口",
                         placeholder: "38440",
@@ -304,11 +304,11 @@ struct RouterSettingsView: View {
                     )
                 }
             }
-            .padding(8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
+            .padding(Spacing.standard)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.surfaceFill))
 
             // 模型映射
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.standard) {
                 Label("模型映射", systemImage: "arrow.left.arrow.right")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -325,19 +325,19 @@ struct RouterSettingsView: View {
                     fieldWidth: nil
                 )
             }
-            .padding(8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.05)))
+            .padding(Spacing.standard)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.surfaceFill))
 
             // 并发 + 间隔
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: Spacing.relaxed) {
+                VStack(alignment: .leading, spacing: Spacing.tight) {
                     Text("最大并发数 (0为无限制)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     TextField("0", text: $editing.maxConcurrency)
                         .textFieldStyle(.roundedBorder)
                 }
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.tight) {
                     Text("最小请求间隔 (毫秒, 0为无限制)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -364,13 +364,13 @@ struct RouterSettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(!routerIsValid() || editing == initial)
             }
-            .padding(.top, 4)
+            .padding(.top, Spacing.tight)
         }
         .padding(.all, 10)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.surfaceFill))
     }
 
     // MARK: - 自定义服务器地址
@@ -383,10 +383,10 @@ struct RouterSettingsView: View {
             Text("要快速切换 provider（URL + 查询模式 + 路由 + 默认模型 一次性设齐）？请到上方「路由代理」开关下方的预设 chip。")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
+                .padding(.bottom, Spacing.tight)
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.tight) {
                     Text("控制台网页 Base URL")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -404,7 +404,7 @@ struct RouterSettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.tight) {
                     Text("API Base URL")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -428,7 +428,7 @@ struct RouterSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
-            .frame(height: 28)
+            .uniformButtonHeight()
             .disabled(apiURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                       dashboardURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -479,7 +479,7 @@ struct RouterSettingsView: View {
 
     @ViewBuilder
     private func requiredRouterField(label: String, placeholder: String, text: Binding<String>, fieldWidth: CGFloat?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
             HStack(spacing: 2) {
                 Text(label)
                     .font(.caption2)

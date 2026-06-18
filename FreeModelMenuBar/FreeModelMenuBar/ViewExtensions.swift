@@ -11,7 +11,7 @@ import SwiftUI
 extension View {
     /// 详情区/菜单栏分段 Divider（4pt 垂直 padding），6 处共用
     func sectionDivider() -> some View {
-        Divider().padding(.vertical, 4)
+        Divider().padding(.vertical, Spacing.tight)
     }
 
     /// Toast 反馈徽章（4 处共用：accountCreated / codexConfigCreated / baseURLCopied / logsCleared）
@@ -49,17 +49,23 @@ extension View {
 
     /// 详情区 3 段内部 VStack（与 sectionPanel 内部 padding 16 对齐）
     func sectionVStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 16, content: content)
+        VStack(alignment: .leading, spacing: Spacing.loose, content: content)
     }
 
     /// 侧边栏内联添加行背景（blue 6pt 圆角小卡片）——2 处统一使用（账号 + Codex 注入）
     func addRowPanel() -> some View {
         self
-            .padding(8)
+            .padding(Spacing.standard)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.blue.opacity(0.08))
             )
+    }
+
+    /// 详情区/日志按钮统一高度 28pt（替代散落的 .frame(height: 28)）——10 处共用
+    /// 默认 28pt；后续要全局调整按钮高度只改这里即可
+    func uniformButtonHeight(_ height: CGFloat = 28) -> some View {
+        self.frame(height: height)
     }
 
     /// 导航区 Header（设置窗口标题 + 日志段标题共用）
@@ -95,6 +101,36 @@ extension Binding where Value == Bool {
         )
     }
 }
+
+// MARK: - 滑动条覆盖样式（NSView 桥接）
+
+struct OverlayScrollerModifier: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.alphaValue = 0
+        DispatchQueue.main.async {
+            var current = view.superview
+            while current != nil {
+                if let scrollView = current as? NSScrollView {
+                    scrollView.scrollerStyle = .overlay
+                    scrollView.scrollerKnobStyle = .default
+                    break
+                }
+                current = current?.superview
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+extension View {
+    /// 覆盖式滑动条：无 track 背景、仅滚动时浮现滑块
+    func overlayScrollers() -> some View {
+        self.background(OverlayScrollerModifier())
+    }
+}
 //
 //  AppTypography.swift
 //  FreeModelMenuBar
@@ -110,6 +146,21 @@ extension Binding where Value == Bool {
 
 /// 全局字号缩放系数。默认 1.0；要"全局 +20%" 改 1.2 即可。
 let appFontScale: CGFloat = 1.0
+/// 全局 spacing 尺度（5 档语义 token）
+/// - tight (4): 紧凑排版（如 HStack 内 icon + text 紧贴）
+/// - standard (8): 标准间距（最常用，VStack/HStack 段内）
+/// - relaxed (12): 段间呼吸（详情区子段）
+/// - loose (16): 大段间隔（详情区 section 之间）
+/// - section (24): 详情区外圈 padding
+/// 其余 2/6/10/14/18/20 为单点特殊用途，保留原值
+enum Spacing {
+    static let tight: CGFloat = 4
+    static let standard: CGFloat = 8
+    static let relaxed: CGFloat = 12
+    static let loose: CGFloat = 16
+    static let section: CGFloat = 24
+}
+
 
 /// 应用字号档位（6 档：4 类小字号 + 1 档大数字）
 enum AppFont {

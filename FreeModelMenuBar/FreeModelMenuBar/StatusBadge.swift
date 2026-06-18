@@ -24,7 +24,7 @@ struct StatusBadge: View {
     var help: String? = nil
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.tight) {
             Image(systemName: icon)
                 .font(.caption2)
             Text(text)
@@ -32,8 +32,8 @@ struct StatusBadge: View {
                 .lineLimit(1)
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.standard)
+        .padding(.vertical, Spacing.tight)
         .background(
             Capsule().fill(Color.overlayFill)
         )

@@ -43,7 +43,7 @@ struct LogsConsoleView: View {
 
             if let activeAccount = accountManager.activeAccount {
                 let settings = activeAccount.activeRouterSettings
-                HStack(alignment: .top, spacing: 16) {
+                HStack(alignment: .top, spacing: Spacing.loose) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("账号")
                             .font(.caption2)
@@ -86,13 +86,13 @@ struct LogsConsoleView: View {
 
     private var logsConsoleSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.relaxed) {
                 Button(action: copyAllLogs) {
                     Label("复制所有日志", systemImage: "doc.on.doc.fill")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(routerManager.logs.isEmpty)
 
                 Button(action: clearLogsWithToast) {
@@ -100,7 +100,7 @@ struct LogsConsoleView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .frame(height: 28)
+                .uniformButtonHeight()
                 .disabled(routerManager.logs.isEmpty)
 
                 toastBadge(value: logsClearedToast, icon: "trash.fill", tint: .secondary)
@@ -114,12 +114,12 @@ struct LogsConsoleView: View {
                     .foregroundStyle(.secondary)
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: Spacing.tight) {
                         if routerManager.logs.isEmpty {
                             Text("无日志数据")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(.gray)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, Spacing.standard)
                         } else {
                             ForEach(routerManager.logs) { log in
                                 LogRowView(log: log)
@@ -132,10 +132,11 @@ struct LogsConsoleView: View {
                             }
                         }
                     }
-                    .padding(8)
+                    .overlayScrollers()
+                    .padding(Spacing.standard)
                 }
                 .frame(minHeight: 340, maxHeight: .infinity)
-                .background(Color.black)
+                .background(Color.codeBackground)
                 .cornerRadius(6)
                 .textSelection(.enabled)
             }

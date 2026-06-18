@@ -17,7 +17,7 @@ struct SettingsSidebarView: View {
     @State private var renameInput: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.relaxed) {
             List {
                 accountsSection
                 codexSection
@@ -154,25 +154,6 @@ struct SettingsSidebarView: View {
             }
             .buttonStyle(.plain)
         }
-    }
-
-    private func accountListRow(_ account: ProviderAccount) -> some View {
-        accountRow(account)
-            .contextMenu {
-                Button {
-                    renameInput = account.displayName
-                    pendingRenameAccount = account
-                } label: { Label("重命名", systemImage: "pencil") }
-                Button { ClipboardHelper.shared.copy(account.displayName) } label: { Label("复制账号名", systemImage: "doc.on.doc.fill") }
-                Button { ClipboardHelper.shared.copy(account.providerID) } label: { Label("复制 Provider", systemImage: "doc.on.doc.fill") }
-                Button { ClipboardHelper.shared.copy(account.id.uuidString) } label: { Label("复制账号 ID", systemImage: "doc.on.doc.fill") }
-                if account.id != accountManager.activeAccountID {
-                    Divider()
-                    Button { selectAccountAndSync(id: account.id) } label: { Label("设为活跃账号", systemImage: "checkmark.circle.fill") }
-                }
-                Divider()
-                Button(role: .destructive) { pendingDeleteAccount = account } label: { Label("删除账号", systemImage: "trash.fill") }
-            }
     }
 
     private func codexConfigListRow(_ cfg: InjectionConfiguration) -> some View {
@@ -352,7 +333,7 @@ struct SettingsSidebarView: View {
         }
 
         var body: some View {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.standard) {
                 Image(systemName: icon)
                     .font(.app(.sidebarIcon))
                     .foregroundStyle(iconColor)
@@ -369,7 +350,7 @@ struct SettingsSidebarView: View {
                 }
             }
             .padding(.vertical, 3)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Spacing.tight)
             .background(RoundedRectangle(cornerRadius: 4).fill(backgroundFill))
             .contentShape(Rectangle())
             .onHover { isHovered = $0 }
@@ -401,15 +382,14 @@ private struct AddAccountSheet: View {
     @State private var labelDidInit: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.relaxed) {
             HStack {
                 fieldLabel("名称")
                 TextField("例如：我的 DeepSeek", text: $label)
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit(submit)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.tight) {
                 Text("种类")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .font(.caption)
@@ -440,7 +420,7 @@ private struct AddAccountSheet: View {
             }
         }
         .font(.caption)
-        .padding(16)
+        .padding(Spacing.loose)
         .frame(width: 360)
         .onAppear {
             if !labelDidInit {
@@ -448,10 +428,6 @@ private struct AddAccountSheet: View {
                 labelDidInit = true
             }
         }
-    }
-
-    private func submit() {
-        // chip 按钮直接触发 onPickProvider；此函数保留以支持 TextField 回车（目前无选择时不创建）
     }
 
     private func fieldLabel(_ text: String) -> some View {
@@ -476,7 +452,7 @@ private struct AddCodexConfigSheet: View {
     @State private var didInit: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.relaxed) {
             HStack {
                 fieldLabel("标签")
                 TextField("例如：本地 relay", text: $label)
@@ -488,7 +464,7 @@ private struct AddCodexConfigSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.tight) {
                 Text("种类")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .font(.caption)
@@ -519,7 +495,7 @@ private struct AddCodexConfigSheet: View {
             }
         }
         .font(.caption)
-        .padding(16)
+        .padding(Spacing.loose)
         .frame(width: 360)
         .onAppear {
             if !didInit {

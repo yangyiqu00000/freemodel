@@ -12,6 +12,12 @@ import AppKit
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
 
+    /// 设置窗口尺寸 token（SettingsView 与 SettingsWindowController 共用——避免 720×620 散落两处）
+    enum WindowMetrics {
+        /// 设置窗口默认尺寸
+        static let defaultSize = CGSize(width: 720, height: 620)
+    }
+
     private var window: NSWindow?
 
     private init() {}
@@ -32,7 +38,7 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 620),
+            contentRect: NSRect(origin: .zero, size: WindowMetrics.defaultSize),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -42,11 +48,9 @@ final class SettingsWindowController {
         newWindow.isReleasedWhenClosed = false
         newWindow.level = .floating
         newWindow.minSize = NSSize(width: 640, height: 520)
-        // 强制 light appearance —— 修复 Codex 注入页"全黑看不见"问题：
-        // SwiftUI 嵌在 NSWindow 里时，详情区未设显式 background 会透出 NSWindow 底色；
-        // dark mode 下底色近黑，导致整个详情区看上去全黑。锁 light 后浅灰底稳定可见。
-        newWindow.appearance = NSAppearance(named: .aqua)
-        // 同步给 hosting view 一个兜底底色（SwiftUI 内未设 background 的子视图会透出它）
+        // 暗色模式已解锁：所有详情区均有显式 background（windowBackgroundColor / controlBackgroundColor / codeBackground），
+        // 无需再强制 light appearance。详见 SettingsView:95 / CodexInjectionSettingsView:81,86 / SemanticColors.codeBackground。
+        // 注：logs 控制台和代码编辑器故意使用深色底（Color.codeBackground），与暗色主题自然融合。
         hostingController.view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         hostingController.view.wantsLayer = true
 

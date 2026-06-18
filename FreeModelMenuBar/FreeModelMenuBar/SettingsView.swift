@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    private static let windowSize = CGSize(width: 720, height: 620)
 
     @EnvironmentObject var accountManager: AccountManager
     @EnvironmentObject var balanceManager: BalanceManager
@@ -83,7 +82,8 @@ struct SettingsView: View {
                         emptyStateView(.noSelection)
                     }
                 }
-                .padding(24)
+                    .overlayScrollers()
+                    .padding(Spacing.section)
             }
             .onChange(of: pendingScrollToAPIKey) { newValue in
                 if newValue {
@@ -94,7 +94,7 @@ struct SettingsView: View {
         }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(width: Self.windowSize.width, height: Self.windowSize.height)
+        .frame(width: SettingsWindowController.WindowMetrics.defaultSize.width, height: SettingsWindowController.WindowMetrics.defaultSize.height)
         .onAppear {
             if let activeID = accountManager.activeAccountID {
                 selectedItem = .account(activeID)
@@ -130,7 +130,7 @@ struct SettingsView: View {
     }
 
     private func emptyStateView(_ kind: EmptyStateKind) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.relaxed) {
             switch kind {
             case .noSelection:
                 Image(systemName: "person.crop.circle.badge.plus")
@@ -155,7 +155,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 360)
-        .padding(24)
+        .padding(Spacing.section)
     }
 
     // MARK: - Toast 自动隐藏（Task 取消模式防过期复活）

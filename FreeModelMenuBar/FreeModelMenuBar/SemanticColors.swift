@@ -23,4 +23,10 @@ extension Color {
     static let accentFill = Color.accentColor.opacity(0.18)
     /// 胶囊徽章 / 标签灰底
     static let overlayFill = Color.gray.opacity(0.12)
+
+    /// 代码/日志编辑器背景（light: 近黑 #141414, dark: 深灰 #2E2E2E，确保与窗口底色可区分）
+    static let codeBackground = Color(nsColor: NSColor(name: nil, dynamicProvider: { appearance in
+        let isDark = appearance.name == .darkAqua || appearance.name == .vibrantDark
+        return NSColor(white: isDark ? 0.18 : 0.08, alpha: 1.0)
+    }))
 }

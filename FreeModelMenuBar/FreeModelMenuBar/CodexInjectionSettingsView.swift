@@ -51,18 +51,19 @@ struct CodexInjectionSettingsView: View {
     private func content(for cfg: InjectionConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             header(for: cfg)
-                .padding(.bottom, 12)
+                .padding(.bottom, Spacing.relaxed)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     basicInfoSection(for: cfg)
                     editorsSection(for: cfg)
                 }
-                .padding(.vertical, 4)
+                .overlayScrollers()
+                .padding(.vertical, Spacing.tight)
             }
             .frame(maxHeight: .infinity)
 
-            Divider().padding(.vertical, 8)
+            Divider().padding(.vertical, Spacing.standard)
 
             bottomActions(for: cfg)
         }
@@ -87,7 +88,7 @@ struct CodexInjectionSettingsView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.relaxed) {
             Image(systemName: "questionmark.circle")
                 .font(.title)
                 .foregroundStyle(.secondary)
@@ -141,7 +142,7 @@ struct CodexInjectionSettingsView: View {
     private func basicInfoSection(for cfg: InjectionConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("基本信息", systemImage: "tag")
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: Spacing.loose) {
                 labeledTextField(
                     label: "标签",
                     placeholder: "标签",
@@ -280,8 +281,8 @@ struct CodexInjectionSettingsView: View {
         initialValue: String,
         onRevert: @escaping () -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            HStack(spacing: Spacing.tight) {
                 Text(label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
