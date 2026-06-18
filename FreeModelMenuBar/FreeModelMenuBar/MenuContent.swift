@@ -384,6 +384,14 @@ struct MenuContent: View {
                     Text(routerBaseURL(settings.port))
                         .font(.app(.microTag))
                         .foregroundStyle(.blue)
+                        .help("点击复制到剪贴板")
+                        .onHover { inside in
+                            if inside { NSCursor.pointingHand.push() }
+                            else { NSCursor.pop() }
+                        }
+                        .onTapGesture {
+                            ClipboardHelper.shared.copy(routerBaseURL(settings.port))
+                        }
                 }
                 Spacer()
                 
@@ -393,18 +401,6 @@ struct MenuContent: View {
                         guard account.hasAPIKey else { return }
                         routerManager.toggleRouter()
                     }
-                
-                if routerManager.status.isRunning {
-                    Button(action: {
-                        ClipboardHelper.shared.copy(routerBaseURL(settings.port))
-                    }) {
-                        Image(systemName: "doc.on.doc.fill")
-                            .font(.app(.microTag))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, Spacing.tight)
-                }
             }
         }
         .padding(.horizontal, Spacing.relaxed)
