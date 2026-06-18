@@ -149,45 +149,15 @@ struct MenuContent: View {
                 .padding(.bottom, 2)
 
             ForEach(accountManager.accounts) { account in
-                let isActive = (account.id == accountManager.activeAccountID)
-                Button {
-                    accountManager.selectAccount(id: account.id)
-                    balanceManager.syncFromActiveAccount()
-                } label: {
-                    HStack {
-                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isActive ? .blue : .secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(account.displayName)
-                                .lineLimit(1)
-                                .fontWeight(isActive ? .semibold : .regular)
-                            switch account.queryMode {
-                            case .dashboard:
-                                Text(account.hasDashboardSession ? "已保存控制台登录态" : "未登录控制台")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            case .apiKey:
-                                Text(account.hasAPIKey ? "已保存 API Key" : "未配置 API Key")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                        if let balance = account.lastBalance {
-                            Text(balance.remainingFormatted)
-                                .font(.caption)
-                                .foregroundStyle(balance.isLow ? .orange : .green)
-                        }
+                AccountMenuRow(
+                    account: account,
+                    isActive: account.id == accountManager.activeAccountID,
+                    balance: account.lastBalance,
+                    action: {
+                        accountManager.selectAccount(id: account.id)
+                        balanceManager.syncFromActiveAccount()
                     }
-                    .padding(.horizontal, Spacing.standard)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(isActive ? Color.accentFill : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
+                )
             }
         }
         .padding(.horizontal, Spacing.loose)
@@ -448,5 +418,64 @@ struct MenuContent: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.08)))
         .padding(.horizontal, Spacing.loose)
         .padding(.bottom, Spacing.tight)
+    }
+}
+
+// MARK: - 菜单栏账号行
+
+private struct AccountMenuRow: View {
+    let account: ProviderAccount
+    let isActive: Bool
+    let balance: BalanceInfo?
+    let action: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isActive ? .blue : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.displayName)
+                        .lineLimit(1)
+                        .fontWeight(isActive ? .semibold : .regular)
+                    switch account.queryMode {
+                    case .dashboard:
+                        Text(account.hasDashboardSession ? "已保存控制台登录态" : "未登录控制台")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    case .apiKey:
+                        Text(account.hasAPIKey ? "已保存 API Key" : "未配置 API Key")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if let balance {
+                    Text(balance.remainingFormatted)
+                        .font(.caption)
+                        .foregroundStyle(balance.isLow ? .orange : .green)
+                }
+            }
+            .padding(.horizontal, Spacing.standard)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(backgroundFill)
+            )
+            .onHover { hovering in
+                let duration = hovering ? 0.25 : 0.1
+                withAnimation(.easeInOut(duration: duration)) { isHovered = hovering }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var backgroundFill: Color {
+        if isActive { return Color.accentFill }
+        if isHovered { return Color.secondary.opacity(0.10) }
+        return Color.clear
     }
 }
