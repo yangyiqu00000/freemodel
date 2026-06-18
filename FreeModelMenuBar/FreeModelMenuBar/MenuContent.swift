@@ -388,7 +388,7 @@ struct MenuContent: View {
                     Text(routerBaseURL(settings.port))
                         .font(.app(.microTag))
                         .foregroundStyle(.blue)
-                        .help("点击复制到剪贴板")
+                        .underline()
                         .onTapGesture {
                             ClipboardHelper.shared.copy(routerBaseURL(settings.port))
                         }

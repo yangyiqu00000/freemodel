@@ -5,7 +5,6 @@ struct LogsConsoleView: View {
     @ObservedObject var accountManager: AccountManager
 
     @State private var logsClearedToast: String?
-    @State private var baseURLCopiedToast: String?
     @State private var toastTask: Task<Void, Never>?
 
     var body: some View {
@@ -23,22 +22,6 @@ struct LogsConsoleView: View {
                     subtitle: routerManager.status.subtitle,
                     dotColor: routerManager.status.statusColor
                 )
-                if let activeAccount = accountManager.activeAccount {
-                    let isRunning = routerManager.status.isRunning
-                    let portVal = activeAccount.activeRouterSettings.port
-                    let urlString = routerBaseURL(portVal)
-                    Button(action: {
-                        ClipboardHelper.shared.copy(urlString)
-                        showToast("Base URL 已复制", at: $baseURLCopiedToast)
-                    }) {
-                        Label("复制 Base URL", systemImage: "doc.on.doc.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(!isRunning)
-                    .help(isRunning ? "复制 \(urlString) 到剪贴板" : "启动路由代理后才可复制 Base URL")
-                    toastBadge(value: baseURLCopiedToast, icon: "doc.on.doc.fill", tint: .blue)
-                }
             }
 
             if let activeAccount = accountManager.activeAccount {
@@ -88,7 +71,7 @@ struct LogsConsoleView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: Spacing.relaxed) {
                 Button(action: copyAllLogs) {
-                    Label("复制所有日志", systemImage: "doc.on.doc.fill")
+                    Label("复制日志", systemImage: "doc.on.doc.fill")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
