@@ -353,7 +353,10 @@ struct SettingsSidebarView: View {
             .padding(.horizontal, Spacing.tight)
             .background(RoundedRectangle(cornerRadius: 4).fill(backgroundFill))
             .contentShape(Rectangle())
-            .onHover { isHovered = $0 }
+            .onHover { hovering in
+                let duration = hovering ? 0.25 : 0.1
+                withAnimation(.easeInOut(duration: duration)) { isHovered = hovering }
+            }
         }
 
         private var backgroundFill: Color {
