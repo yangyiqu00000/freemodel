@@ -385,10 +385,6 @@ struct MenuContent: View {
                         .font(.app(.microTag))
                         .foregroundStyle(.blue)
                         .help("点击复制到剪贴板")
-                        .onHover { inside in
-                            if inside { NSCursor.pointingHand.push() }
-                            else { NSCursor.pop() }
-                        }
                         .onTapGesture {
                             ClipboardHelper.shared.copy(routerBaseURL(settings.port))
                         }
