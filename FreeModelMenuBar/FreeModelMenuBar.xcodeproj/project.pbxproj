@@ -166,7 +166,7 @@
 				<key>COMBINE_HIDPI_IMAGES</key>
 				<string>YES</string>
 				<key>CURRENT_PROJECT_VERSION</key>
-				<string>1</string>
+				<string>2</string>
 				<key>DEVELOPMENT_TEAM</key>
 				<string></string>
 				<key>ENABLE_HARDENED_RUNTIME</key>
@@ -186,7 +186,7 @@
 				<key>MACOSX_DEPLOYMENT_TARGET</key>
 				<string>13.0</string>
 				<key>MARKETING_VERSION</key>
-				<string>1.0</string>
+				<string>0.0.2</string>
 				<key>PRODUCT_BUNDLE_IDENTIFIER</key>
 				<string>com.freemodel.menubar</string>
 				<key>PRODUCT_NAME</key>
@@ -227,7 +227,7 @@
 				<key>COMBINE_HIDPI_IMAGES</key>
 				<string>YES</string>
 				<key>CURRENT_PROJECT_VERSION</key>
-				<string>1</string>
+				<string>2</string>
 				<key>DEVELOPMENT_TEAM</key>
 				<string></string>
 				<key>ENABLE_HARDENED_RUNTIME</key>
@@ -247,7 +247,7 @@
 				<key>MACOSX_DEPLOYMENT_TARGET</key>
 				<string>13.0</string>
 				<key>MARKETING_VERSION</key>
-				<string>1.0</string>
+				<string>0.0.2</string>
 				<key>PRODUCT_BUNDLE_IDENTIFIER</key>
 				<string>com.freemodel.menubar</string>
 				<key>PRODUCT_NAME</key>

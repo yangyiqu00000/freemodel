@@ -15,7 +15,7 @@
 [![Release](https://img.shields.io/github/v/release/yangyiqu00000/freemodel)](https://github.com/yangyiqu00000/freemodel/releases)
 [![Stars](https://img.shields.io/github/stars/yangyiqu00000/freemodel?style=social)](https://github.com/yangyiqu00000/freemodel)
 
-[⬇️ Download v0.0.1](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
+[⬇️ Download v0.0.2](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
 
 </div>
 
@@ -143,8 +143,8 @@ After step 5, you'll never touch `config.toml` again.
 
 ### Option A: Grab the DMG (recommended)
 
-1. Head to [**Releases → v0.0.1**](https://github.com/yangyiqu00000/freemodel/releases/latest)
-2. Download `FreeModelMenuBar-0.0.1.dmg`
+1. Head to [**Releases → v0.0.2**](https://github.com/yangyiqu00000/freemodel/releases/latest)
+2. Download `FreeModelMenuBar-0.0.2.dmg`
 3. Open it, drag the app into `/Applications`
 4. Launch it — look for 💲 in your menu bar
 
@@ -220,7 +220,7 @@ A: Ad-hoc is fine for personal use and casual sharing. Notarization
 | UI | SwiftUI + `MenuBarExtra` | Native, no Electron, no 200MB binary |
 | Lifecycle | AppKit + `NSWorkspace` notifications | Wake-from-sleep auto-heal |
 | Storage | macOS Keychain | Keys never on disk in plaintext |
-| Router | Node.js (`node:http` / `node:https`) | Zero deps, ~300 lines |
+| Router | Node.js (`node:http` / `node:https`) | Zero deps, protocol auto-detect |
 | Process model | `Process` + `readabilityHandler` | Clean shutdown, no zombie ports |
 
 Project layout:
@@ -252,6 +252,11 @@ Already shipped:
 - [x] Wake-from-sleep auto-heal
 - [x] Keychain-backed credential storage
 - [x] Menu-bar balance monitoring with color-coded alerts
+- [x] **Anthropic Messages protocol support** — router now also translates
+      Responses → Anthropic Messages for Claude-compatible endpoints
+- [x] **Protocol auto-detection** — router detects upstream protocol from
+      URL suffix (`/v1/messages` → Anthropic, `/v1/chat/completions` → Chat)
+- [x] **Settings sidebar drag-and-drop** — reorder account cards intuitively
 
 Coming next:
 

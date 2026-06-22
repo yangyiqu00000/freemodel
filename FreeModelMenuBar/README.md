@@ -15,7 +15,10 @@
 - **多维度常用预设**：一键应用主流服务商（FreeModel、DeepSeek、OpenRouter、ModelScope）的 API 地址、控制台及路由预设。
 
 ### 2. ⚡ 本地 Responses 协议路由中转（Node.js 侧车）
-- **Responses ➡️ Chat Completions 协议互转**：在本地拉起轻量级中转服务（`http://127.0.0.1:{port}/v1`），自动将客户端发起的 Responses 协议请求（Cursor 等所用协议）转换为标准的 OpenAI Chat Completions 协议发送至您的上游服务商。
+- **多协议自动转换**：在本地拉起轻量级中转服务（`http://127.0.0.1:{port}/v1`），自动将 Responses 协议请求转换为上游所需协议：
+  - **Responses ➡️ Chat Completions**（OpenAI 兼容服务商，默认）
+  - **Responses ➡️ Anthropic Messages**（Claude 兼容端点，自动识别）
+- **协议自动检测**：根据 URL 后缀（`/v1/messages` / `v1/chat/completions`）自动选择协议，无需手动配置。
 - **智能角色映射（Developer ➡️ System）**：自动将最新协议中的 `developer` 角色智能映射为上游大模型所需的 `system` 角色，彻底杜绝上游解析器抛出 `unknown variant developer` 导致的 400 报错。
 - **连接自适应清理（防残留）**：实时监听 `res.on('close')` 与 `res.writableFinished`，一旦客户端主动取消生成（如在 Cursor 中停止生成），代理将立即销毁上游 TCP 请求，杜绝 Token 额度浪费与带宽占用。
 - **Responses 标准错误流集成**：在发生错误或上游请求失败时，自动将其包装为标准的 `event: response.failed` SSE 事件，使客户端能够优雅解码异常信息。
