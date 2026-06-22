@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsSidebarView: View {
     @Binding var selectedItem: SettingsView.SidebarItem?
@@ -103,9 +104,23 @@ struct SettingsSidebarView: View {
                 Button {
                     selectAccountAndSync(id: account.id)
                 } label: {
-                    accountRow(account)
+                    HStack(spacing: 6) {
+                        accountRow(account)
+                        Spacer(minLength: 0)
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .help("按住拖动以重新排序")
+                    }
                 }
                 .buttonStyle(.plain)
+                .onDrag {
+                    NSItemProvider(object: account.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: AccountReorderDropDelegate(
+                    targetID: account.id,
+                    accountManager: accountManager
+                ))
                 .contextMenu {
                     Button {
                         renameInput = account.displayName
@@ -122,6 +137,7 @@ struct SettingsSidebarView: View {
                     Button(role: .destructive) { pendingDeleteAccount = account } label: { Label("删除账号", systemImage: "trash.fill") }
                 }
             }
+            .animation(.easeInOut(duration: 0.22), value: accountManager.accounts)
         }
     }
 
@@ -131,10 +147,25 @@ struct SettingsSidebarView: View {
                 Button {
                     selectedItem = .codexInjectionConfig(cfg.id)
                 } label: {
-                    codexConfigListRow(cfg)
+                    HStack(spacing: 6) {
+                        codexConfigListRow(cfg)
+                        Spacer(minLength: 0)
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .help("按住拖动以重新排序")
+                    }
                 }
                 .buttonStyle(.plain)
+                .onDrag {
+                    NSItemProvider(object: cfg.id as NSString)
+                }
+                .onDrop(of: [.text], delegate: CodexConfigReorderDropDelegate(
+                    targetID: cfg.id,
+                    codexInjectionLayer: codexInjectionLayer
+                ))
             }
+            .animation(.easeInOut(duration: 0.22), value: codexInjectionLayer.injectionConfigurations)
         }
     }
 
@@ -515,4 +546,53 @@ private struct AddCodexConfigSheet: View {
             .font(.caption)
             .foregroundStyle(.secondary)
     }
+}
+
+
+// MARK: - Sidebar reorder drop delegates
+
+private struct AccountReorderDropDelegate: DropDelegate {
+    let targetID: UUID
+    let accountManager: AccountManager
+
+    func dropEntered(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [.text]).first else { return }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let raw = object as? NSString,
+                  let uuid = UUID(uuidString: raw as String),
+                  uuid != targetID,
+                  let from = accountManager.accounts.firstIndex(where: { $0.id == uuid }),
+                  let to = accountManager.accounts.firstIndex(where: { $0.id == targetID })
+            else { return }
+            if from == to { return }
+            DispatchQueue.main.async {
+                accountManager.moveAccount(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+            }
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool { true }
+}
+
+private struct CodexConfigReorderDropDelegate: DropDelegate {
+    let targetID: String
+    let codexInjectionLayer: AppLayer
+
+    func dropEntered(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [.text]).first else { return }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let raw = object as? NSString else { return }
+            let draggedID = raw as String
+            guard draggedID != targetID,
+                  let from = codexInjectionLayer.injectionConfigurations.firstIndex(where: { $0.id == draggedID }),
+                  let to = codexInjectionLayer.injectionConfigurations.firstIndex(where: { $0.id == targetID })
+            else { return }
+            if from == to { return }
+            DispatchQueue.main.async {
+                codexInjectionLayer.moveConfiguration(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+            }
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool { true }
 }

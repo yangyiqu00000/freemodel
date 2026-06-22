@@ -33,7 +33,7 @@ enum ProviderPreset: String, CaseIterable, Identifiable {
         apiURL: "https://api.freemodel.dev",
         dashboardURL: "https://freemodel.dev",
         queryMode: .dashboard,
-        routerUpstream: "https://api.freemodel.dev/v1",
+        routerUpstream: "https://api.freemodel.dev/v1/chat/completions",
         defaultModel: "codex-mini",
         routeModel: "codex-mini"
     )
@@ -42,7 +42,7 @@ enum ProviderPreset: String, CaseIterable, Identifiable {
         apiURL: "https://api.deepseek.com",
         dashboardURL: "https://platform.deepseek.com",
         queryMode: .apiKey,
-        routerUpstream: "https://api.deepseek.com/v1",
+        routerUpstream: "https://api.deepseek.com/v1/chat/completions",
         defaultModel: "deepseek-chat",
         routeModel: "codex-mini"
     )
@@ -51,7 +51,7 @@ enum ProviderPreset: String, CaseIterable, Identifiable {
         apiURL: "https://openrouter.ai/api/v1",
         dashboardURL: "https://openrouter.ai",
         queryMode: .apiKey,
-        routerUpstream: "https://openrouter.ai/api/v1",
+        routerUpstream: "https://openrouter.ai/api/v1/chat/completions",
         defaultModel: "deepseek/deepseek-v4-flash:free",
         routeModel: "codex-mini"
     )
@@ -60,7 +60,7 @@ enum ProviderPreset: String, CaseIterable, Identifiable {
         apiURL: "https://api-inference.modelscope.cn",
         dashboardURL: "https://modelscope.cn",
         queryMode: .apiKey,
-        routerUpstream: "https://api-inference.modelscope.cn/v1",
+        routerUpstream: "https://api-inference.modelscope.cn/v1/chat/completions",
         defaultModel: "ZhipuAI/GLM-5.1",
         routeModel: "codex-mini"
     )
@@ -195,7 +195,7 @@ struct RouterSettingsView: View {
                 }
             }
 
-            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为 Chat Completions 协议发送给上游服务商。")
+            Text("为当前账号开启本地端口代理，将输入的 Responses 协议请求（如 Codex/cc switch 客户端发来）自动中转为上游服务商的协议（Chat Completions / Anthropic Messages 等）。请填写完整上游 API 地址。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -298,7 +298,7 @@ struct RouterSettingsView: View {
                     )
                     requiredRouterField(
                         label: "上游 API Base URL",
-                        placeholder: "https://api.deepseek.com/v1",
+                        placeholder: "https://api.deepseek.com/v1/chat/completions",
                         text: $editing.upstreamURL,
                         fieldWidth: nil
                     )

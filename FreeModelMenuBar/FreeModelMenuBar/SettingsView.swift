@@ -94,7 +94,7 @@ struct SettingsView: View {
         }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(width: SettingsWindowController.WindowMetrics.defaultSize.width, height: SettingsWindowController.WindowMetrics.defaultSize.height)
+        .frame(width: WindowMetrics.defaultSize.width, height: WindowMetrics.defaultSize.height)
         .onAppear {
             if let activeID = accountManager.activeAccountID {
                 selectedItem = .account(activeID)

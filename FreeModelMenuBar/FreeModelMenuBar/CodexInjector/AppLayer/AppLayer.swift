@@ -254,6 +254,12 @@ public final class AppLayer: ObservableObject {
         persistInjectionState()
     }
 
+    public func moveConfiguration(fromOffsets source: IndexSet, toOffset destination: Int) {
+        injectionConfigurations.move(fromOffsets: source, toOffset: destination)
+        persistInjectionState()
+    }
+
+
     public func activateConfiguration(id: String) {
         guard let cfg = injectionConfigurations.first(where: { $0.id == id }) else {
             lastError = "未找到该配置"
