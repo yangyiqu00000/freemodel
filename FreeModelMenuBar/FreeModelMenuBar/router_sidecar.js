@@ -478,7 +478,306 @@ function isDeepseekOrReasoningModel(modelName, url) {
            lowerUrl.includes('deepseek');
 }
 
-function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, lastStatusCode = 502, lastErrorMsg = 'All upstream providers failed', lastUpstreamModel = '') {
+// ── Protocol detection ──
+function detectProtocol(url) {
+    const u = url.toLowerCase();
+    if (u.endsWith('/v1/messages')) return 'anthropic-messages';
+    if (u.endsWith('/v1/responses')) return 'responses';
+    return 'chat';
+}
+
+// ── Anthropic Messages request builder ──
+function buildAnthropicPayload(reqBody, modelName) {
+    const messages = [];
+    let system = null;
+    const input = reqBody.input;
+    if (!input) return { model: modelName, messages: [], max_tokens: 4096, stream: false };
+
+    // ── Determine logical role for each input item ──
+    function itemRole(item) {
+        if (typeof item === 'string') return 'user';
+        if (!item || typeof item !== 'object') return 'user';
+        if (item.type === 'function_call') return 'assistant';
+        if (item.type === 'function_call_output') return 'user';
+        const r = item.role || 'user';
+        if (r === 'developer' || r === 'system') return 'system';
+        return r;
+    }
+
+    // ── Turn: collects all content for one user or assistant message ──
+    let currentRole = null;
+    let currentText = '';
+    let currentTools = [];      // tool_use blocks for assistant
+    let currentResults = [];    // tool_result blocks for user
+    let hasContent = false;
+
+    function flushTurn() {
+        if (!currentRole || !hasContent) return;
+        const content = [];
+        if (currentText) content.push({ type: 'text', text: currentText });
+        content.push(...currentTools);
+        content.push(...currentResults);
+        // Single text-only message → use plain string
+        const finalContent = content.length === 1 && content[0].type === 'text' ? content[0].text : content;
+        messages.push({ role: currentRole, content: finalContent });
+        // Reset accumulators
+        currentText = '';
+        currentTools = [];
+        currentResults = [];
+        hasContent = false;
+    }
+
+    function ensureTurn(role) {
+        if (currentRole !== role) {
+            flushTurn();
+            currentRole = role;
+        }
+    }
+
+    // ── Process input items ──
+    if (typeof input === 'string') {
+        messages.push({ role: 'user', content: input });
+    } else if (Array.isArray(input)) {
+        for (const item of input) {
+            const role = itemRole(item);
+            if (role === 'system') {
+                const txt = typeof item.content === 'string' ? item.content : '';
+                if (txt && !system) system = txt;
+                continue;
+            }
+            if (typeof item === 'string') {
+                ensureTurn('user');
+                currentText += (currentText ? '\n' : '') + item;
+                hasContent = true;
+            } else if (item && typeof item === 'object') {
+                if (item.type === 'function_call') {
+                    ensureTurn('assistant');
+                    currentTools.push({
+                        type: 'tool_use',
+                        id: item.call_id || item.id,
+                        name: item.name,
+                        input: (() => { try { return JSON.parse(item.arguments || '{}'); } catch { return {}; } })()
+                    });
+                    hasContent = true;
+                } else if (item.type === 'function_call_output') {
+                    ensureTurn('user');
+                    currentResults.push({
+                        type: 'tool_result',
+                        tool_use_id: item.call_id,
+                        content: typeof item.output === 'string' ? item.output : JSON.stringify(item.output ?? '')
+                    });
+                    hasContent = true;
+                } else {
+                    // Regular user/assistant message
+                    let role = item.role || 'user';
+                    ensureTurn(role);
+                    let content = item.content || '';
+                    if (typeof content === 'string') {
+                        currentText += (currentText ? '\n' : '') + content;
+                    } else if (Array.isArray(content)) {
+                        for (const p of content) {
+                            if (p && typeof p === 'object') {
+                                const c = { ...p };
+                                if (c.type === 'input_text' || c.type === 'output_text') c.type = 'text';
+                                if (c.input_text !== undefined) { c.text = c.input_text; delete c.input_text; }
+                                delete c.input_audio; delete c.input_image;
+                                if (c.type === 'text' && c.text) currentText += (currentText ? '\n' : '') + c.text;
+                            }
+                        }
+                    }
+                    hasContent = true;
+                }
+            }
+        }
+        flushTurn();
+    }
+
+    // ── Tools ──
+    const tools = [];
+    if (Array.isArray(reqBody.tools)) {
+        for (const t of reqBody.tools) {
+            if (t && t.type === 'function') {
+                const fn = t.function || t;
+                tools.push({ name: fn.name, description: fn.description || '', input_schema: fn.parameters || fn.input_schema || {} });
+            }
+        }
+    }
+
+    const payload = {
+        model: modelName,
+        messages,
+        max_tokens: reqBody.max_output_tokens || reqBody.max_tokens || 4096,
+        stream: !!reqBody.stream
+    };
+    if (system) payload.system = system;
+    if (tools.length) payload.tools = tools;
+    if (reqBody.temperature !== undefined) payload.temperature = reqBody.temperature;
+
+    if (reqBody.tool_choice) {
+        const tc = reqBody.tool_choice;
+        if (tc === 'auto') payload.tool_choice = { type: 'auto' };
+        else if (tc === 'any' || tc === 'required') payload.tool_choice = { type: 'any' };
+        else if (tc.type === 'function') payload.tool_choice = { type: 'tool', name: tc.name || tc.function?.name };
+    }
+
+    return payload;
+}
+
+// ── Anthropic non-streaming response converter ──
+function convertAnthropicToResponses(json, routeModel) {
+    const respId = 'resp_' + Math.random().toString(36).substring(2, 15);
+    const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
+    const createdTime = Math.floor(Date.now() / 1000);
+    const output = [];
+    let fullText = '';
+
+    if (json.content && Array.isArray(json.content)) {
+        for (const block of json.content) {
+            if (block.type === 'text') {
+                fullText += block.text;
+                output.push(makeMessageItem(itemId, 'completed', block.text));
+            } else if (block.type === 'tool_use') {
+                output.push(makeFunctionCallItem(
+                    'fc_' + Math.random().toString(36).substring(2, 15),
+                    block.id,
+                    'completed',
+                    block.name,
+                    JSON.stringify(block.input || {})
+                ));
+            }
+        }
+    }
+
+    const usage = normalizeUsage(json.usage, 0, 0);
+    return { ...makeResponseObject(respId, createdTime, 'completed', output, fullText, usage) };
+}
+
+// ── Anthropic streaming event converter ──
+function processAnthropicStream(upstreamRes, res, respId, createdTime, routeModel, onFinish, start) {
+    const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
+    let seq = 0;
+
+    function we(ev, pl) {
+        res.write(`event: ${ev}\ndata: ${JSON.stringify({ type: ev, sequence_number: seq++, ...pl })}\n\n`);
+    }
+
+    let nextOutIdx = 0;
+    let textOutIdx = null;
+    let textStarted = false;
+    const toolStates = new Map();
+    let accText = '';
+    let accInputTokens = 0;
+    let accOutputTokens = 0;
+
+    function startText() {
+        if (textStarted) return;
+        textStarted = true;
+        textOutIdx = nextOutIdx++;
+        we('response.output_item.added', { response_id: respId, output_index: textOutIdx, item: makeMessageItem(itemId, 'in_progress', '') });
+        we('response.content_part.added', { response_id: respId, item_id: itemId, output_index: textOutIdx, content_index: 0, part: makeOutputTextPart('') });
+    }
+
+    function onBlockStart(idx, block) {
+        if (block.type === 'text') {
+            startText();
+        } else if (block.type === 'tool_use') {
+            const callId = block.id || 'call_' + Math.random().toString(36).substring(2, 12);
+            toolStates.set(idx, {
+                itemId: 'fc_' + Math.random().toString(36).substring(2, 15),
+                callId,
+                name: block.name || '',
+                args: '',
+                outIdx: nextOutIdx++
+            });
+            we('response.output_item.added', { response_id: respId, output_index: toolStates.get(idx).outIdx, item: makeFunctionCallItem(toolStates.get(idx).itemId, callId, 'in_progress', block.name || '', '') });
+        }
+    }
+
+    function onBlockDelta(idx, delta) {
+        if (delta.type === 'text_delta') {
+            startText();
+            const t = delta.text || '';
+            if (t) { accText += t; we('response.output_text.delta', { response_id: respId, item_id: itemId, output_index: textOutIdx, content_index: 0, delta: t }); }
+        } else if (delta.type === 'input_json_delta') {
+            const s = toolStates.get(idx);
+            if (s && delta.partial_json) { s.args += delta.partial_json; we('response.function_call_arguments.delta', { response_id: respId, item_id: s.itemId, output_index: s.outIdx, delta: delta.partial_json }); }
+        }
+    }
+
+    function onBlockStop(idx) {
+        if (textStarted && !toolStates.has(idx) && textOutIdx !== null) {
+            we('response.output_text.done', { response_id: respId, item_id: itemId, output_index: textOutIdx, content_index: 0, text: accText });
+            we('response.content_part.done', { response_id: respId, item_id: itemId, output_index: textOutIdx, content_index: 0, part: makeOutputTextPart(accText) });
+            we('response.output_item.done', { response_id: respId, output_index: textOutIdx, item: makeMessageItem(itemId, 'completed', accText) });
+        }
+        const s = toolStates.get(idx);
+        if (s) {
+            we('response.function_call_arguments.done', { response_id: respId, item_id: s.itemId, output_index: s.outIdx, arguments: s.args });
+            we('response.output_item.done', { response_id: respId, output_index: s.outIdx, item: makeFunctionCallItem(s.itemId, s.callId, 'completed', s.name, s.args) });
+        }
+    }
+
+    we('response.created', { response: makeResponseObject(respId, createdTime, 'in_progress', [], '', null) });
+
+    let buf = '', evType = '', evData = '';
+
+    function processEvent(etype, dstr) {
+        if (!dstr) return;
+        let d;
+        try { d = JSON.parse(dstr); } catch { return; }
+        switch (etype) {
+            case 'message_start': if (d.message?.usage) accInputTokens = d.message.usage.input_tokens || 0; break;
+            case 'content_block_start': onBlockStart(d.index, d.content_block); break;
+            case 'content_block_delta': onBlockDelta(d.index, d.delta); break;
+            case 'content_block_stop': onBlockStop(d.index); break;
+            case 'message_delta': if (d.usage) accOutputTokens = d.usage.output_tokens || 0; break;
+            case 'message_stop': {
+                const usage = normalizeUsage({ input_tokens: accInputTokens, output_tokens: accOutputTokens }, 0, 0);
+                const out = [];
+                if (textStarted) out[textOutIdx] = makeMessageItem(itemId, 'completed', accText);
+                for (const [, s] of toolStates) out[s.outIdx] = makeFunctionCallItem(s.itemId, s.callId, 'completed', s.name, s.args);
+                we('response.completed', { response: makeResponseObject(respId, createdTime, 'completed', out.filter(Boolean), accText, usage) });
+                res.end();
+                logRequest('POST', '/v1/responses', 200, Date.now() - start, routeModel, UPSTREAM_MODEL);
+                onFinish();
+                break;
+            }
+        }
+    }
+
+    upstreamRes.on('data', (chunk) => {
+        buf += chunk.toString('utf8');
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+        for (const line of lines) {
+            const t = line.trim();
+            if (t.startsWith('event: ')) { evType = t.substring(7).trim(); }
+            else if (t.startsWith('data: ')) { evData = t.substring(6).trim(); }
+            else if (!t && evType) { processEvent(evType, evData); evType = ''; evData = ''; }
+        }
+    });
+
+    upstreamRes.on('end', () => {
+        if (buf.trim()) {
+            const lines = buf.split('\n');
+            for (const line of lines) {
+                const t = line.trim();
+                if (t.startsWith('event: ')) { evType = t.substring(7).trim(); }
+                else if (t.startsWith('data: ')) { evData = t.substring(6).trim(); }
+                else if (!t && evType) { processEvent(evType, evData); evType = ''; evData = ''; }
+            }
+        }
+    });
+
+    upstreamRes.on('error', (err) => {
+        console.error('[Proxy] Anthropic stream error:', err.message);
+        sendJSONError(res, 502, 'Anthropic stream error: ' + err.message);
+        onFinish();
+    });
+}
+
+// ── dispatchWithFailover ──
+function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, lastStatusCode = 502, lastErrorMsg = 'All upstream providers failed', lastUpstreamModel = '', protocol = 'chat', reqBody = null) {
     if (candidateIndex >= candidates.length) {
         // All candidates failed
         console.error(`[Proxy] All candidates failed. Returning error: ${lastErrorMsg}`);
@@ -502,44 +801,53 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
         error: `[Proxy] 正在将请求发送至渠道 ${candidateIndex + 1}/${candidates.length}: ${candidate.id} (${candidate.url})`
     }));
 
-    // Construct target payload specifically for this candidate, removing reasoning_content/reasoning_effort if not supported
+    // Build protocol-specific payload
     const isReasoning = isDeepseekOrReasoningModel(candidate.model, candidate.url);
-    const requestPayload = {
-        ...chatPayload,
-        model: candidate.model
-    };
-    if (!isReasoning) {
-        delete requestPayload.reasoning_effort;
-    }
-    if (Array.isArray(chatPayload.messages)) {
-        requestPayload.messages = chatPayload.messages.map(m => {
-            if (m.role === 'assistant' && m.reasoning_content !== undefined) {
-                const newMsg = { ...m };
-                if (!isReasoning) {
-                    delete newMsg.reasoning_content;
+    let requestPayload, payloadStr;
+    if (protocol === 'anthropic-messages') {
+        requestPayload = buildAnthropicPayload(reqBody || {}, candidate.model);
+        payloadStr = JSON.stringify(requestPayload);
+    } else {
+        // Chat Completions (default)
+        requestPayload = {
+            ...chatPayload,
+            model: candidate.model
+        };
+        if (!isReasoning) {
+            delete requestPayload.reasoning_effort;
+        }
+        if (Array.isArray(chatPayload.messages)) {
+            requestPayload.messages = chatPayload.messages.map(m => {
+                if (m.role === 'assistant' && m.reasoning_content !== undefined) {
+                    const newMsg = { ...m };
+                    if (!isReasoning) {
+                        delete newMsg.reasoning_content;
+                    }
+                    return newMsg;
                 }
-                return newMsg;
-            }
-            return m;
-        });
+                return m;
+            });
+        }
+        payloadStr = JSON.stringify(requestPayload);
     }
 
-    let targetUrlStr = candidate.url;
-    if (!targetUrlStr.endsWith('/chat/completions')) {
-        targetUrlStr = targetUrlStr.replace(/\/$/, '') + '/chat/completions';
-    }
-
+    // Use full URL as-is (no path auto-append)
+    const targetUrlStr = candidate.url;
     const parsedTargetUrl = new URL(targetUrlStr);
     const isHttps = parsedTargetUrl.protocol === 'https:';
     const requester = isHttps ? https : http;
-    const payloadStr = JSON.stringify(requestPayload);
 
     const headers = {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payloadStr)
     };
     if (candidate.key) {
-        headers['Authorization'] = `Bearer ${candidate.key}`;
+        if (protocol === 'anthropic-messages') {
+            headers['x-api-key'] = candidate.key;
+            headers['anthropic-version'] = '2023-06-01';
+        } else {
+            headers['Authorization'] = `Bearer ${candidate.key}`;
+        }
     }
 
     const requestOptions = {
@@ -568,6 +876,78 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
     upstreamReq = requester.request(requestOptions, (upstreamRes) => {
         const statusCode = upstreamRes.statusCode;
 
+        // ── Anthropic Messages response ──
+        if (protocol === 'anthropic-messages') {
+            if (stream) {
+                // Anthropic streaming
+                if (statusCode >= 400) {
+                    let errorBody = '';
+                    upstreamRes.on('data', d => { errorBody += d; });
+                    upstreamRes.on('end', () => {
+                        let errorMsg = `Anthropic upstream error: ${statusCode}`;
+                        try { const pe = JSON.parse(errorBody); errorMsg = pe.error?.message || pe.type?.message || errorMsg; } catch (_) {}
+                        if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
+                            res.off('close', clientCloseHandler);
+                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
+                        } else {
+                            sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
+                            logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
+                            onFinish();
+                        }
+                    });
+                    return;
+                }
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Transfer-Encoding': 'chunked',
+                    'X-Accel-Buffering': 'no',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                const rId = 'resp_' + Math.random().toString(36).substring(2, 15);
+                const cTime = Math.floor(Date.now() / 1000);
+                processAnthropicStream(upstreamRes, res, rId, cTime, routeModel, onFinish, start);
+                return;
+            } else {
+                // Anthropic non-streaming
+                let responseData = '';
+                upstreamRes.on('data', chunk => { responseData += chunk; });
+                upstreamRes.on('end', () => {
+                    let json;
+                    try { json = JSON.parse(responseData || '{}'); } catch (err) {
+                        if (candidateIndex + 1 < candidates.length) {
+                            res.off('close', clientCloseHandler);
+                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 500, 'JSON parse failed', candidate.model, protocol, reqBody);
+                        } else {
+                            sendJSONError(res, 500, 'Failed to parse Anthropic response: ' + err.message, 'upstream_parse_error', 500);
+                            onFinish();
+                        }
+                        return;
+                    }
+                    if (statusCode >= 400) {
+                        const errorMsg = json.error?.message || json.type?.message || 'Anthropic upstream error';
+                        if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
+                            res.off('close', clientCloseHandler);
+                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
+                        } else {
+                            sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
+                            logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
+                            onFinish();
+                        }
+                        return;
+                    }
+                    const responsesJson = convertAnthropicToResponses(json, routeModel);
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify(responsesJson));
+                    logRequest('POST', parsedUrl.pathname, 200, Date.now() - start, routeModel, candidate.model);
+                    onFinish();
+                });
+                return;
+            }
+        }
+
+        // ── Chat Completions response (default) ──
         if (stream) {
             // Streaming response conversion
             if (statusCode >= 400) {
@@ -592,7 +972,7 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
                             error: `[Proxy] 渠道 ${candidate.id} 请求失败 (状态码 ${statusCode}: ${errorMsg})，正在自动尝试备用渠道...`
                         }));
                         res.off('close', clientCloseHandler);
-                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model);
+                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
                     } else {
                         sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
                         logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
@@ -983,7 +1363,7 @@ data: ${JSON.stringify(eventData)}
                             error: `[Proxy] 渠道 ${candidate.id} 返回非 JSON 数据，正在尝试下一个备用渠道...`
                         }));
                         res.off('close', clientCloseHandler);
-                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 500, 'JSON parse failed', candidate.model);
+                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 500, 'JSON parse failed', candidate.model, protocol, reqBody);
                     } else {
                         sendJSONError(res, 500, 'Failed to parse upstream response: ' + err.message, 'upstream_parse_error', 500);
                         logRequest('POST', parsedUrl.pathname, 500, Date.now() - start, routeModel, candidate.model, 'Upstream response not JSON');
@@ -1006,7 +1386,7 @@ data: ${JSON.stringify(eventData)}
                             error: `[Proxy] 渠道 ${candidate.id} 请求失败 (状态码 ${statusCode}: ${errorMsg})，正在自动尝试备用渠道...`
                         }));
                         res.off('close', clientCloseHandler);
-                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model);
+                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
                     } else {
                         sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
                         logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
@@ -1080,7 +1460,7 @@ data: ${JSON.stringify(eventData)}
                 error: `[Proxy] 渠道 ${candidate.id} 连接失败 (${err.message})，正在自动尝试备用渠道...`
             }));
             res.off('close', clientCloseHandler);
-            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 502, err.message, candidate.model);
+            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 502, err.message, candidate.model, protocol, reqBody);
         } else {
             sendJSONError(res, 502, 'Upstream connection error: ' + err.message, 'upstream_connection_error', 502);
             logRequest('POST', parsedUrl.pathname, 502, Date.now() - start, routeModel, candidate.model, err.message);
@@ -1347,7 +1727,9 @@ const server = http.createServer((req, res) => {
                     });
                 }
             }
-            dispatchWithFailover(candidates, 0, chatPayload, stream, res, req, parsedUrl, start, currentConfig.routeModel, release);
+            // Detect protocol from primary candidate URL
+            const primaryProtocol = candidates.length > 0 ? detectProtocol(candidates[0].url) : 'chat';
+            dispatchWithFailover(candidates, 0, chatPayload, stream, res, req, parsedUrl, start, currentConfig.routeModel, release, 502, 'All upstream providers failed', '', primaryProtocol, reqBody);
         });
     } else {
         // Not Found
