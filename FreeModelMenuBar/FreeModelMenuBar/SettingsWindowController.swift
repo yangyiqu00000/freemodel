@@ -8,24 +8,78 @@
 import SwiftUI
 import AppKit
 
+/// 设置窗口的 NSWindowController 子类。
+/// 使用标准 NSWindowController 生命周期：windowDidLoad 是 Apple 文档明确推荐
+/// 的"窗口首次出现定位"钩子，在此处调 center() 让窗口从第一帧就落在屏幕正中。
+/// 设置窗口尺寸 token（SettingsView 与 SettingsWindowController 共用——避免 720×620 散落两处）
+enum WindowMetrics {
+    /// 设置窗口默认尺寸
+    static let defaultSize = CGSize(width: 720, height: 620)
+}
+
+@MainActor
+final class SettingsNSWindowController: NSWindowController, NSWindowDelegate {
+    convenience init(rootView: AnyView) {
+        let hosting = NSHostingController(rootView: rootView)
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: WindowMetrics.defaultSize),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hosting
+        window.title = "设置"
+        window.isReleasedWhenClosed = false
+        window.isRestorable = false
+        window.minSize = NSSize(width: 640, height: 520)
+        window.setFrameAutosaveName("")
+        hosting.view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        hosting.view.wantsLayer = true
+        self.init(window: window)
+        window.delegate = self
+    }
+
+    override func windowDidLoad() {
+        super.windowDidLoad()
+        // 标准做法：Apple 文档推荐的"窗口首次出现定位"钩子。
+        // center() 内部使用 NSScreen.main.visibleFrame 的中点（已正确排除 menu bar 与 Dock），
+        // 不需要手算 origin。NSWindowController 走完 windowDidLoad 后才会 orderFront，
+        // 因此窗口第一帧就显示在屏幕正中，不会出现"先在 (0,0) 出现再被居中"的双阶段跳变。
+        window?.center()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        // 通知 holder 释放引用（避免窗口被关闭后控制器还持有 NSWindow）
+        NotificationCenter.default.post(name: .settingsWindowDidClose, object: nil)
+    }
+}
+
+extension Notification.Name {
+    static let settingsWindowDidClose = Notification.Name("com.freemodel.settingsWindowDidClose")
+}
+
 @MainActor
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
 
-    /// 设置窗口尺寸 token（SettingsView 与 SettingsWindowController 共用——避免 720×620 散落两处）
-    enum WindowMetrics {
-        /// 设置窗口默认尺寸
-        static let defaultSize = CGSize(width: 720, height: 620)
+    private var controller: SettingsNSWindowController?
+
+    private init() {
+        NotificationCenter.default.addObserver(
+            forName: .settingsWindowDidClose,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.controller = nil
+            }
+        }
     }
-
-    private var window: NSWindow?
-
-    private init() {}
 
     /// 打开或激活设置窗口
     func openSettings(balanceManager: BalanceManager, accountManager: AccountManager, routerManager: RouterManager) {
-        if let existingWindow = window, existingWindow.isVisible {
-            existingWindow.makeKeyAndOrderFront(nil)
+        if let existing = controller, existing.window?.isVisible == true {
+            existing.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
@@ -35,45 +89,18 @@ final class SettingsWindowController {
             .environmentObject(balanceManager)
             .environmentObject(routerManager)
 
-        let hostingController = NSHostingController(rootView: settingsView)
-
-        let newWindow = NSWindow(
-            contentRect: NSRect(origin: .zero, size: WindowMetrics.defaultSize),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        newWindow.title = "FreeModel 设置"
-        newWindow.contentViewController = hostingController
-        newWindow.isReleasedWhenClosed = false
-        newWindow.level = .floating
-        newWindow.minSize = NSSize(width: 640, height: 520)
-        // 暗色模式已解锁：所有详情区均有显式 background（windowBackgroundColor / controlBackgroundColor / codeBackground），
-        // 无需再强制 light appearance。详见 SettingsView:95 / CodexInjectionSettingsView:81,86 / SemanticColors.codeBackground。
-        // 注：logs 控制台和代码编辑器故意使用深色底（Color.codeBackground），与暗色主题自然融合。
-        hostingController.view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        hostingController.view.wantsLayer = true
-
-        newWindow.makeKeyAndOrderFront(nil)
+        let new = SettingsNSWindowController(rootView: AnyView(settingsView))
+        // showWindow 触发 windowDidLoad（center 发生在这里），然后 makeKeyAndOrderFront
+        // 在下一轮主循环把窗口推到屏幕上——此时 frame 已经在屏幕正中。
+        new.showWindow(nil)
+        new.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-
-        // 窗口显示后再居中（菜单栏应用在 makeKeyAndOrderFront 之前 screen 可能为 nil）
-        DispatchQueue.main.async {
-            if let screen = newWindow.screen ?? NSScreen.main {
-                let rect = newWindow.frame
-                newWindow.setFrameOrigin(NSPoint(
-                    x: screen.visibleFrame.midX - rect.width / 2,
-                    y: screen.visibleFrame.midY - rect.height / 2
-                ))
-            }
-        }
-
-        self.window = newWindow
+        self.controller = new
     }
 
     /// 关闭设置窗口
     func closeSettings() {
-        window?.close()
-        window = nil
+        controller?.close()
+        controller = nil
     }
 }

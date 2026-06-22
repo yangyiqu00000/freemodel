@@ -463,6 +463,12 @@ final class AccountManager: ObservableObject {
         persist()
     }
 
+    func moveAccount(fromOffsets source: IndexSet, toOffset destination: Int) {
+        accounts.move(fromOffsets: source, toOffset: destination)
+        persist()
+    }
+
+
     func renameAccount(id: UUID, displayName: String) {
         let cleaned = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return }
