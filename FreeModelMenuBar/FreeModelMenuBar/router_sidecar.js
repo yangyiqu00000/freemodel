@@ -43,6 +43,7 @@ const CONFIG = {
     maxListenRetries: parseInt(process.env.PROXY_MAX_LISTEN_RETRIES || '5', 10),
     listenRetryDelayMs: parseInt(process.env.PROXY_LISTEN_RETRY_MS || '500', 10),
     stdinCloseThresholdMs: parseInt(process.env.PROXY_STDIN_CLOSE_THRESHOLD_MS || '200', 10),
+    streamInactivityTimeoutMs: parseInt(process.env.PROXY_STREAM_TIMEOUT_MS || '60000', 10),
 };
 
 const reasoningContentByCallId = new Map();
@@ -668,8 +669,18 @@ function convertAnthropicToResponses(json, routeModel) {
 
 // ── Anthropic streaming event converter ──
 function processAnthropicStream(upstreamRes, res, respId, createdTime, routeModel, onFinish, start) {
+    let streamEnded = false;
     const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
     let seq = 0;
+
+    const streamTimeout = setTimeout(() => {
+        if (streamEnded) return;
+        streamEnded = true;
+        console.error('[Proxy] Anthropic stream inactivity timeout');
+        sendJSONError(res, 502, 'Upstream stream inactivity timeout', 'upstream_stream_timeout', 502);
+        upstreamRes.destroy();
+        onFinish();
+    }, CONFIG.streamInactivityTimeoutMs);
 
     function we(ev, pl) {
         res.write(`event: ${ev}\ndata: ${JSON.stringify({ type: ev, sequence_number: seq++, ...pl })}\n\n`);
@@ -760,6 +771,7 @@ function processAnthropicStream(upstreamRes, res, respId, createdTime, routeMode
     }
 
     upstreamRes.on('data', (chunk) => {
+        streamTimeout.refresh();
         buf += chunk.toString('utf8');
         const lines = buf.split('\n');
         buf = lines.pop() || '';
@@ -772,6 +784,9 @@ function processAnthropicStream(upstreamRes, res, respId, createdTime, routeMode
     });
 
     upstreamRes.on('end', () => {
+        if (streamEnded) return;
+        streamEnded = true;
+        clearTimeout(streamTimeout);
         if (buf.trim()) {
             const lines = buf.split('\n');
             for (const line of lines) {
@@ -784,6 +799,9 @@ function processAnthropicStream(upstreamRes, res, respId, createdTime, routeMode
     });
 
     upstreamRes.on('error', (err) => {
+        if (streamEnded) return;
+        streamEnded = true;
+        clearTimeout(streamTimeout);
         console.error('[Proxy] Anthropic stream error:', err.message);
         sendJSONError(res, 502, 'Anthropic stream error: ' + err.message);
         onFinish();
@@ -1239,16 +1257,27 @@ data: ${JSON.stringify(eventData)}
                 }
             }
 
+            const streamTimeout = setTimeout(() => {
+                if (streamEnded) return;
+                streamEnded = true;
+                console.error('[Proxy] Chat stream inactivity timeout');
+                sendJSONError(res, 502, 'Upstream stream inactivity timeout', 'upstream_stream_timeout', 502);
+                upstreamReq.destroy();
+                onFinish();
+            }, CONFIG.streamInactivityTimeoutMs);
+
             upstreamRes.on('data', (chunk) => {
+                streamTimeout.refresh();
                 buffer += decoder.write(chunk);
                 const lines = buffer.split('\n');
-                buffer = lines.pop(); // keep last incomplete line
+                buffer = lines.pop();
                 processSSELines(lines);
             });
 
             upstreamRes.on('end', () => {
                 if (streamEnded) return;
                 streamEnded = true;
+                clearTimeout(streamTimeout);
 
                 // Flush remaining buffer
                 buffer += decoder.end();
@@ -1343,10 +1372,10 @@ data: ${JSON.stringify(eventData)}
                 onFinish();
             });
 
-            // Handle upstream connection errors during streaming
             upstreamRes.on('error', (err) => {
                 if (streamEnded) return;
                 streamEnded = true;
+                clearTimeout(streamTimeout);
                 console.error('[Proxy] Upstream response error during streaming:', err.message);
                 sendJSONError(res, 502, 'Upstream stream error: ' + err.message, 'upstream_stream_error', 502);
                 logRequest('POST', parsedUrl.pathname, 502, Date.now() - start, routeModel, candidate.model, 'Stream error: ' + err.message);
