@@ -36,6 +36,15 @@ Object.defineProperty(global, 'UPSTREAM_MODEL', {
     configurable: true
 });
 
+// ── Configuration Constants ──
+const CONFIG = {
+    mapSizeLimit: parseInt(process.env.PROXY_MAP_SIZE_LIMIT || '200', 10),
+    defaultMaxTokens: parseInt(process.env.PROXY_DEFAULT_MAX_TOKENS || '4096', 10),
+    maxListenRetries: parseInt(process.env.PROXY_MAX_LISTEN_RETRIES || '5', 10),
+    listenRetryDelayMs: parseInt(process.env.PROXY_LISTEN_RETRY_MS || '500', 10),
+    stdinCloseThresholdMs: parseInt(process.env.PROXY_STDIN_CLOSE_THRESHOLD_MS || '200', 10),
+};
+
 const reasoningContentByCallId = new Map();
 const toolResultByCallId = new Map();
 
@@ -95,9 +104,7 @@ if (require.main === module) {
     });
 
     rl.on('close', () => {
-        // If stdin closes immediately on startup, it means it was spawned with 'ignore' or redirection (e.g. in legacy tests).
-        // In this case, do not exit the process.
-        if (Date.now() - STARTUP_TIME < 200) {
+        if (Date.now() - STARTUP_TIME < CONFIG.stdinCloseThresholdMs) {
             return;
         }
         console.log(JSON.stringify({
@@ -322,7 +329,7 @@ function rememberReasoningContent(callId, reasoningContent) {
         return;
     }
     reasoningContentByCallId.set(callId, reasoningContent);
-    if (reasoningContentByCallId.size > 200) {
+    if (reasoningContentByCallId.size > CONFIG.mapSizeLimit) {
         const oldestKey = reasoningContentByCallId.keys().next().value;
         reasoningContentByCallId.delete(oldestKey);
     }
@@ -333,7 +340,7 @@ function rememberToolResult(callId, content) {
         return;
     }
     toolResultByCallId.set(callId, String(content));
-    if (toolResultByCallId.size > 200) {
+    if (toolResultByCallId.size > CONFIG.mapSizeLimit) {
         const oldestKey = toolResultByCallId.keys().next().value;
         toolResultByCallId.delete(oldestKey);
     }
@@ -613,7 +620,7 @@ function buildAnthropicPayload(reqBody, modelName) {
     const payload = {
         model: modelName,
         messages,
-        max_tokens: reqBody.max_output_tokens || reqBody.max_tokens || 4096,
+        max_tokens: reqBody.max_output_tokens || reqBody.max_tokens || CONFIG.defaultMaxTokens,
         stream: !!reqBody.stream
     };
     if (system) payload.system = system;
@@ -1745,19 +1752,18 @@ const server = http.createServer((req, res) => {
 });
 
 let listenRetries = 0;
-const MAX_LISTEN_RETRIES = 5;
 
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        if (listenRetries < MAX_LISTEN_RETRIES) {
+        if (listenRetries < CONFIG.maxListenRetries) {
             listenRetries++;
-            console.warn(`[Proxy] 端口 ${PORT} 被占用，将在 500ms 后重试... (第 ${listenRetries}/${MAX_LISTEN_RETRIES} 次尝试)`);
+            console.warn(`[Proxy] 端口 ${PORT} 被占用，将在 ${CONFIG.listenRetryDelayMs}ms 后重试... (第 ${listenRetries}/${CONFIG.maxListenRetries} 次尝试)`);
             setTimeout(() => {
                 server.close();
                 server.listen(PORT, '127.0.0.1');
-            }, 500);
+            }, CONFIG.listenRetryDelayMs);
         } else {
-            console.error(`[Proxy] 绑定端口 ${PORT} 失败，已重试 ${MAX_LISTEN_RETRIES} 次，端口已被其他进程占用。`);
+            console.error(`[Proxy] 绑定端口 ${PORT} 失败，已重试 ${CONFIG.maxListenRetries} 次，端口已被其他进程占用。`);
             process.exit(1);
         }
     } else {
