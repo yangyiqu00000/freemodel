@@ -44,71 +44,75 @@ let activeCount = 0;
 let lastRequestStartTime = 0;
 let queueTimeout = null;
 
-console.log(`[Proxy] Initial Settings: Concurrency Limit = ${currentConfig.maxConcurrency}, Min Interval = ${currentConfig.minIntervalMs}ms`);
-
-// Exit automatically on EOF, and support dynamic config updates via stdin JSON lines
-const readline = require('readline');
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false
-});
-
-rl.on('line', (line) => {
-    try {
-        const msg = JSON.parse(line);
-        if (msg.type === 'update_config') {
-            if (msg.activeAccount) {
-                currentConfig.activeProviderId = msg.activeAccount.providerID || 'primary';
-                currentConfig.upstreamBaseUrl = (msg.activeAccount.url || '').trim();
-                currentConfig.upstreamApiKey = (msg.activeAccount.key || '').trim();
-                currentConfig.upstreamModel = (msg.activeAccount.model || '').trim();
-            }
-            if (msg.backups !== undefined) {
-                currentConfig.providers = msg.backups;
-            }
-            if (msg.routeModel !== undefined) currentConfig.routeModel = msg.routeModel;
-            if (msg.maxConcurrency !== undefined) currentConfig.maxConcurrency = parseInt(msg.maxConcurrency, 10) || 0;
-            if (msg.minIntervalMs !== undefined) currentConfig.minIntervalMs = parseInt(msg.minIntervalMs, 10) || 0;
-            if (msg.failoverEnabled !== undefined) {
-                currentConfig.failoverEnabled = !!msg.failoverEnabled;
-            }
-
-            console.log(JSON.stringify({
-                time: new Date().toTimeString().split(' ')[0],
-                method: "SYS",
-                path: "",
-                status: 200,
-                duration: 0,
-                model: "",
-                upstream: "",
-                error: `[Proxy] 配置动态更新成功: Upstream = ${currentConfig.upstreamBaseUrl}, Model = ${currentConfig.upstreamModel}, Backups = ${currentConfig.providers.length}, Failover = ${currentConfig.failoverEnabled}`
-            }));
-        }
-    } catch (err) {
-        // Ignore parsing errors of non-config stdin lines
-    }
-});
-
 const STARTUP_TIME = Date.now();
-rl.on('close', () => {
-    // If stdin closes immediately on startup, it means it was spawned with 'ignore' or redirection (e.g. in legacy tests).
-    // In this case, do not exit the process.
-    if (Date.now() - STARTUP_TIME < 200) {
-        return;
-    }
-    console.log(JSON.stringify({
-        time: new Date().toTimeString().split(' ')[0],
-        method: "SYS",
-        path: "",
-        status: 200,
-        duration: 0,
-        model: "",
-        upstream: "",
-        error: "检测到主应用进程已退出，路由侧车自主终止。"
-    }));
-    process.exit(0);
-});
+
+// readline-based IPC and initial log only needed when run as main process
+if (require.main === module) {
+    console.log(`[Proxy] Initial Settings: Concurrency Limit = ${currentConfig.maxConcurrency}, Min Interval = ${currentConfig.minIntervalMs}ms`);
+
+    // Exit automatically on EOF, and support dynamic config updates via stdin JSON lines
+    const readline = require('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        terminal: false
+    });
+
+    rl.on('line', (line) => {
+        try {
+            const msg = JSON.parse(line);
+            if (msg.type === 'update_config') {
+                if (msg.activeAccount) {
+                    currentConfig.activeProviderId = msg.activeAccount.providerID || 'primary';
+                    currentConfig.upstreamBaseUrl = (msg.activeAccount.url || '').trim();
+                    currentConfig.upstreamApiKey = (msg.activeAccount.key || '').trim();
+                    currentConfig.upstreamModel = (msg.activeAccount.model || '').trim();
+                }
+                if (msg.backups !== undefined) {
+                    currentConfig.providers = msg.backups;
+                }
+                if (msg.routeModel !== undefined) currentConfig.routeModel = msg.routeModel;
+                if (msg.maxConcurrency !== undefined) currentConfig.maxConcurrency = parseInt(msg.maxConcurrency, 10) || 0;
+                if (msg.minIntervalMs !== undefined) currentConfig.minIntervalMs = parseInt(msg.minIntervalMs, 10) || 0;
+                if (msg.failoverEnabled !== undefined) {
+                    currentConfig.failoverEnabled = !!msg.failoverEnabled;
+                }
+
+                console.log(JSON.stringify({
+                    time: new Date().toTimeString().split(' ')[0],
+                    method: "SYS",
+                    path: "",
+                    status: 200,
+                    duration: 0,
+                    model: "",
+                    upstream: "",
+                    error: `[Proxy] 配置动态更新成功: Upstream = ${currentConfig.upstreamBaseUrl}, Model = ${currentConfig.upstreamModel}, Backups = ${currentConfig.providers.length}, Failover = ${currentConfig.failoverEnabled}`
+                }));
+            }
+        } catch (err) {
+            // Ignore parsing errors of non-config stdin lines
+        }
+    });
+
+    rl.on('close', () => {
+        // If stdin closes immediately on startup, it means it was spawned with 'ignore' or redirection (e.g. in legacy tests).
+        // In this case, do not exit the process.
+        if (Date.now() - STARTUP_TIME < 200) {
+            return;
+        }
+        console.log(JSON.stringify({
+            time: new Date().toTimeString().split(' ')[0],
+            method: "SYS",
+            path: "",
+            status: 200,
+            duration: 0,
+            model: "",
+            upstream: "",
+            error: "检测到主应用进程已退出，路由侧车自主终止。"
+        }));
+        process.exit(0);
+    });
+}
 
 function enqueue(item) {
     queue.push(item);
@@ -388,10 +392,11 @@ function normalizeToolChoice(toolChoice) {
     return undefined;
 }
 
-function repairToolCallMessageOrder(messages) {
+function repairToolCallMessageOrder(messages, externalToolResults = null) {
     const consumed = new Set();
     const repaired = [];
     const toolMessageIndexesById = new Map();
+    const toolResults = externalToolResults || toolResultByCallId;
 
     for (let i = 0; i < messages.length; i += 1) {
         const message = messages[i];
@@ -400,7 +405,9 @@ function repairToolCallMessageOrder(messages) {
                 toolMessageIndexesById.set(message.tool_call_id, []);
             }
             toolMessageIndexesById.get(message.tool_call_id).push(i);
-            rememberToolResult(message.tool_call_id, message.content);
+            if (!externalToolResults) {
+                rememberToolResult(message.tool_call_id, message.content);
+            }
         }
     }
 
@@ -437,26 +444,26 @@ function repairToolCallMessageOrder(messages) {
                     }
                 }
 
-	                if (matchingToolIndex === -1) {
-	                    matchingToolIndex = findAnyUnconsumedToolMessage(toolCallId);
-	                }
-	
-	                if (matchingToolIndex !== -1) {
-	                    repaired.push(messages[matchingToolIndex]);
-	                    consumed.add(matchingToolIndex);
-	                } else if (toolResultByCallId.has(toolCallId)) {
-	                    repaired.push(makeToolMessage(toolCallId, toolResultByCallId.get(toolCallId)));
-	                } else {
-	                    repaired.push(makeSyntheticMissingToolMessage(toolCallId));
-	                }
-	            }
-	            continue;
-	        }
-	
-	        if (message.role === 'tool') {
-	            consumed.add(i);
-	            continue;
-	        }
+                if (matchingToolIndex === -1) {
+                    matchingToolIndex = findAnyUnconsumedToolMessage(toolCallId);
+                }
+
+                if (matchingToolIndex !== -1) {
+                    repaired.push(messages[matchingToolIndex]);
+                    consumed.add(matchingToolIndex);
+                } else if (toolResults.has(toolCallId)) {
+                    repaired.push(makeToolMessage(toolCallId, toolResults.get(toolCallId)));
+                } else {
+                    repaired.push(makeSyntheticMissingToolMessage(toolCallId));
+                }
+            }
+            continue;
+        }
+
+        if (message.role === 'tool') {
+            consumed.add(i);
+            continue;
+        }
 
         repaired.push(message);
         consumed.add(i);

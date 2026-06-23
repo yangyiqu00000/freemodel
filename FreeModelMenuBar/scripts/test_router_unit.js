@@ -368,7 +368,7 @@ test('repairToolCallMessageOrder: already correct order unchanged', () => {
         { role: 'assistant', content: null, tool_calls: [{ id: 'c1', function: { name: 'f' } }] },
         { role: 'tool', tool_call_id: 'c1', content: 'result' }
     ];
-    const r = repairToolCallMessageOrder(input);
+    const r = repairToolCallMessageOrder(input, new Map());
     assert.strictEqual(r.error, undefined);
     assert.strictEqual(r.messages.length, 2);
 });
@@ -377,10 +377,20 @@ test('repairToolCallMessageOrder: inserts synthetic message for missing tool res
     const input = [
         { role: 'assistant', content: null, tool_calls: [{ id: 'c_missing_1', function: { name: 'f' } }] }
     ];
-    const r = repairToolCallMessageOrder(input);
+    const r = repairToolCallMessageOrder(input, new Map());
     assert.strictEqual(r.messages.length, 2);
     assert.strictEqual(r.messages[1].role, 'tool');
     assert.ok(r.messages[1].content.includes('missing_from_restored_history'));
+});
+
+test('repairToolCallMessageOrder: uses externalToolResults for context restoration', () => {
+    const input = [
+        { role: 'assistant', content: null, tool_calls: [{ id: 'ctx_1', function: { name: 'f' } }] }
+    ];
+    const ctx = new Map([['ctx_1', 'restored_result']]);
+    const r = repairToolCallMessageOrder(input, ctx);
+    assert.strictEqual(r.messages.length, 2);
+    assert.strictEqual(r.messages[1].content, 'restored_result');
 });
 
 test('repairToolCallMessageOrder: reorders out-of-order tool results', () => {
@@ -390,7 +400,7 @@ test('repairToolCallMessageOrder: reorders out-of-order tool results', () => {
         { role: 'assistant', content: null, tool_calls: [{ id: 'c1', function: { name: 'f' } }, { id: 'c2', function: { name: 'g' } }] },
         { role: 'tool', tool_call_id: 'c1', content: 'r1' }
     ];
-    const r = repairToolCallMessageOrder(input);
+    const r = repairToolCallMessageOrder(input, new Map());
     assert.strictEqual(r.error, undefined);
     const toolIdx = r.messages.findIndex(m => m.role === 'assistant');
     assert.strictEqual(r.messages[toolIdx + 1].tool_call_id, 'c1');
