@@ -1759,6 +1759,34 @@ server.on('error', (err) => {
     }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-    console.log(`[Proxy] Server listening on http://127.0.0.1:${PORT}`);
-});
+if (require.main === module) {
+    server.listen(PORT, '127.0.0.1', () => {
+        console.log(`[Proxy] Server listening on http://127.0.0.1:${PORT}`);
+    });
+}
+
+module.exports = {
+    detectProtocol,
+    buildAnthropicPayload,
+    convertAnthropicToResponses,
+    processAnthropicStream,
+    normalizeUsage,
+    normalizeResponsesTool,
+    normalizeToolChoice,
+    repairToolCallMessageOrder,
+    isFailoverableStatus,
+    isDeepseekOrReasoningModel,
+    makeMessageItem,
+    makeFunctionCallItem,
+    makeOutputTextPart,
+    makeResponseObject,
+    makeToolMessage,
+    rememberReasoningContent,
+    rememberToolResult,
+    sendJSONError,
+    logRequest,
+    enqueue,
+    PORT,
+    ROUTE_MODEL,
+    UPSTREAM_MODEL,
+};
