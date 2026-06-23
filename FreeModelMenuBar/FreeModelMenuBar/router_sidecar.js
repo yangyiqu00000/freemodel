@@ -46,6 +46,12 @@ const CONFIG = {
     streamInactivityTimeoutMs: parseInt(process.env.PROXY_STREAM_TIMEOUT_MS || '60000', 10),
 };
 
+// ── Protocol Adapter Registry ──
+const adapters = {};
+function registerProtocol(name, adapter) {
+    adapters[name] = adapter;
+}
+
 const reasoningContentByCallId = new Map();
 const toolResultByCallId = new Map();
 
@@ -808,10 +814,335 @@ function processAnthropicStream(upstreamRes, res, respId, createdTime, routeMode
     });
 }
 
+// ── Chat Completions streaming handler ──
+function processChatStream(upstreamRes, res, {
+    respId, createdTime, routeModel, onFinish, start,
+    candidate, chatPayload, parsedUrl,
+    streamEndedRef, clientCloseHandler,
+    protocol, reqBody, candidates, candidateIndex
+}) {
+    const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
+    let sequenceNumber = 0;
+    function writeResponseEvent(eventType, eventData) {
+        res.write(`event: ${eventType}\ndata: ${JSON.stringify({ type: eventType, sequence_number: sequenceNumber++, ...eventData })}\n\n`);
+    }
+
+    let textOutputIndex = null;
+    let textItemStarted = false;
+    let nextOutputIndex = 0;
+    const toolCallStates = new Map();
+
+    function ensureTextItemStarted() {
+        if (textItemStarted) return;
+        textItemStarted = true;
+        textOutputIndex = nextOutputIndex++;
+        writeResponseEvent('response.output_item.added', {
+            response_id: respId, output_index: textOutputIndex,
+            item: makeMessageItem(itemId, 'in_progress', '')
+        });
+        writeResponseEvent('response.content_part.added', {
+            response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0,
+            part: makeOutputTextPart('')
+        });
+    }
+
+    function ensureToolCallState(toolCall) {
+        const index = toolCall.index;
+        if (toolCallStates.has(index)) return toolCallStates.get(index);
+        const state = {
+            itemId: 'fc_' + Math.random().toString(36).substring(2, 15),
+            callId: toolCall.id || 'call_' + Math.random().toString(36).substring(2, 12),
+            name: toolCall.function?.name || '',
+            arguments: '',
+            outputIndex: nextOutputIndex++
+        };
+        toolCallStates.set(index, state);
+        writeResponseEvent('response.output_item.added', {
+            response_id: respId, output_index: state.outputIndex,
+            item: makeFunctionCallItem(state.itemId, state.callId, 'in_progress', state.name, '')
+        });
+        return state;
+    }
+
+    writeResponseEvent('response.created', {
+        response: makeResponseObject(respId, createdTime, 'in_progress', [], '', null)
+    });
+
+    let buffer = '';
+    const { StringDecoder } = require('string_decoder');
+    const decoder = new StringDecoder('utf8');
+    let completionTokens = 0;
+    let promptTokens = 0;
+    let receivedUsage = false;
+    let accumulatedText = '';
+    let accumulatedReasoningContent = '';
+    let thinkBuffer = '';
+
+    const streamTimeout = setTimeout(() => {
+        if (streamEndedRef.current) return;
+        streamEndedRef.current = true;
+        console.error('[Proxy] Chat stream inactivity timeout');
+        sendJSONError(res, 502, 'Upstream stream inactivity timeout', 'upstream_stream_timeout', 502);
+        res.off('close', clientCloseHandler);
+        upstreamRes.destroy();
+        onFinish();
+    }, CONFIG.streamInactivityTimeoutMs);
+
+    function processSSELines(lines) {
+        for (let line of lines) {
+            line = line.trim();
+            if (!line) continue;
+            if (line.startsWith('data:')) {
+                const dataStr = line.substring(5).trim();
+                if (dataStr === '[DONE]') continue;
+                try {
+                    const json = JSON.parse(dataStr);
+                    if (json.usage) {
+                        promptTokens = json.usage.prompt_tokens || promptTokens;
+                        completionTokens = json.usage.completion_tokens || completionTokens;
+                        receivedUsage = true;
+                    }
+                    const choice = json.choices && json.choices[0];
+                    if (choice && choice.delta) {
+                        if (choice.delta.reasoning_content) {
+                            accumulatedReasoningContent += choice.delta.reasoning_content;
+                        }
+                        if (choice.delta.content) {
+                            const text = choice.delta.content;
+                            thinkBuffer += text;
+                            while (thinkBuffer.length > 0) {
+                                const thinkStartIndex = thinkBuffer.indexOf('<think>');
+                                if (thinkStartIndex !== -1) {
+                                    const thinkEndIndex = thinkBuffer.indexOf('</think>', thinkStartIndex);
+                                    if (thinkEndIndex !== -1) {
+                                        const reasoning = thinkBuffer.substring(thinkStartIndex + 7, thinkEndIndex);
+                                        accumulatedReasoningContent += reasoning;
+                                        const beforeText = thinkBuffer.substring(0, thinkStartIndex);
+                                        if (beforeText) {
+                                            ensureTextItemStarted();
+                                            accumulatedText += beforeText;
+                                            if (!receivedUsage) completionTokens += Math.max(1, Math.ceil(beforeText.length / 3));
+                                            writeResponseEvent('response.output_text.delta', {
+                                                response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, delta: beforeText
+                                            });
+                                        }
+                                        thinkBuffer = thinkBuffer.substring(thinkEndIndex + 8);
+                                    } else {
+                                        const beforeText = thinkBuffer.substring(0, thinkStartIndex);
+                                        if (beforeText) {
+                                            ensureTextItemStarted();
+                                            accumulatedText += beforeText;
+                                            if (!receivedUsage) completionTokens += Math.max(1, Math.ceil(beforeText.length / 3));
+                                            writeResponseEvent('response.output_text.delta', {
+                                                response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, delta: beforeText
+                                            });
+                                        }
+                                        thinkBuffer = thinkBuffer.substring(thinkStartIndex);
+                                        break;
+                                    }
+                                } else {
+                                    let partialMatchIndex = -1;
+                                    for (let i = 1; i < 7; i++) {
+                                        const suffix = thinkBuffer.substring(thinkBuffer.length - i);
+                                        if ('<think>'.startsWith(suffix)) { partialMatchIndex = thinkBuffer.length - i; break; }
+                                    }
+                                    if (partialMatchIndex !== -1) {
+                                        const flushText = thinkBuffer.substring(0, partialMatchIndex);
+                                        if (flushText) {
+                                            ensureTextItemStarted();
+                                            accumulatedText += flushText;
+                                            if (!receivedUsage) completionTokens += Math.max(1, Math.ceil(flushText.length / 3));
+                                            writeResponseEvent('response.output_text.delta', {
+                                                response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, delta: flushText
+                                            });
+                                        }
+                                        thinkBuffer = thinkBuffer.substring(partialMatchIndex);
+                                        break;
+                                    } else {
+                                        ensureTextItemStarted();
+                                        accumulatedText += thinkBuffer;
+                                        if (!receivedUsage) completionTokens += Math.max(1, Math.ceil(thinkBuffer.length / 3));
+                                        writeResponseEvent('response.output_text.delta', {
+                                            response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, delta: thinkBuffer
+                                        });
+                                        thinkBuffer = '';
+                                    }
+                                }
+                            }
+                        }
+                        if (Array.isArray(choice.delta.tool_calls)) {
+                            for (const toolCall of choice.delta.tool_calls) {
+                                const state = ensureToolCallState(toolCall);
+                                if (toolCall.function?.name) state.name = toolCall.function.name;
+                                const argDelta = toolCall.function?.arguments || '';
+                                if (argDelta) {
+                                    state.arguments += argDelta;
+                                    writeResponseEvent('response.function_call_arguments.delta', {
+                                        response_id: respId, item_id: state.itemId, output_index: state.outputIndex, delta: argDelta
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+        }
+    }
+
+    upstreamRes.on('data', (chunk) => {
+        streamTimeout.refresh();
+        buffer += decoder.write(chunk);
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        processSSELines(lines);
+    });
+
+    upstreamRes.on('end', () => {
+        if (streamEndedRef.current) return;
+        streamEndedRef.current = true;
+        clearTimeout(streamTimeout);
+
+        buffer += decoder.end();
+        if (buffer.trim()) processSSELines(buffer.split('\n'));
+
+        if (!promptTokens) {
+            promptTokens = Math.ceil(chatPayload.messages.reduce((acc, m) => {
+                if (typeof m.content === 'string') return acc + m.content.length / 3;
+                if (Array.isArray(m.content)) return acc + m.content.reduce((s, p) => s + (p.text ? p.text.length : 0), 0) / 3;
+                return acc;
+            }, 0));
+        }
+        if (!completionTokens && accumulatedText) completionTokens = Math.ceil(accumulatedText.length / 3);
+
+        const usage = normalizeUsage(null, promptTokens, completionTokens);
+        const completedOutput = [];
+
+        if (textItemStarted) {
+            rememberReasoningContent(itemId, accumulatedReasoningContent);
+            const finalItem = makeMessageItem(itemId, 'completed', accumulatedText);
+            completedOutput[textOutputIndex] = finalItem;
+            writeResponseEvent('response.output_text.done', { response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, text: accumulatedText });
+            writeResponseEvent('response.content_part.done', { response_id: respId, item_id: itemId, output_index: textOutputIndex, content_index: 0, part: makeOutputTextPart(accumulatedText) });
+            writeResponseEvent('response.output_item.done', { response_id: respId, output_index: textOutputIndex, item: finalItem });
+        }
+
+        for (const state of Array.from(toolCallStates.values()).sort((a, b) => a.outputIndex - b.outputIndex)) {
+            rememberReasoningContent(state.callId, accumulatedReasoningContent);
+            const finalToolItem = makeFunctionCallItem(state.itemId, state.callId, 'completed', state.name, state.arguments);
+            completedOutput[state.outputIndex] = finalToolItem;
+            writeResponseEvent('response.function_call_arguments.done', { response_id: respId, item_id: state.itemId, output_index: state.outputIndex, arguments: state.arguments });
+            writeResponseEvent('response.output_item.done', { response_id: respId, output_index: state.outputIndex, item: finalToolItem });
+        }
+
+        writeResponseEvent('response.completed', {
+            response: makeResponseObject(respId, createdTime, 'completed', completedOutput.filter(Boolean), accumulatedText, usage)
+        });
+        res.end();
+        logRequest('POST', parsedUrl.pathname, 200, Date.now() - start, routeModel, candidate.model);
+        onFinish();
+    });
+
+    upstreamRes.on('error', (err) => {
+        if (streamEndedRef.current) return;
+        streamEndedRef.current = true;
+        clearTimeout(streamTimeout);
+        console.error('[Proxy] Upstream response error during streaming:', err.message);
+        sendJSONError(res, 502, 'Upstream stream error: ' + err.message, 'upstream_stream_error', 502);
+        logRequest('POST', parsedUrl.pathname, 502, Date.now() - start, routeModel, candidate.model, 'Stream error: ' + err.message);
+        onFinish();
+    });
+}
+
+// ── Chat Completions non-streaming converter ──
+function convertChatToResponses(json, routeModel) {
+    const message = json.choices && json.choices[0] && json.choices[0].message || {};
+    let content = message.content || '';
+    let reasoningContent = message.reasoning_content || '';
+    if (content.includes('<think>')) {
+        const match = content.match(/<think>([\s\S]*?)<\/think>/);
+        if (match) {
+            reasoningContent = match[1];
+            content = content.replace(/<think>[\s\S]*?<\/think>\n?/g, '');
+        }
+    }
+    const usage = normalizeUsage(json.usage, 0, 0);
+    const respId = 'resp_' + Math.random().toString(36).substring(2, 15);
+    const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
+    const createdTime = Math.floor(Date.now() / 1000);
+    const output = [];
+    if (content) {
+        if (reasoningContent) rememberReasoningContent(itemId, reasoningContent);
+        output.push(makeMessageItem(itemId, 'completed', content));
+    }
+    if (Array.isArray(message.tool_calls)) {
+        for (const toolCall of message.tool_calls) {
+            rememberReasoningContent(toolCall.id, message.reasoning_content || reasoningContent);
+            output.push(makeFunctionCallItem(
+                'fc_' + Math.random().toString(36).substring(2, 15),
+                toolCall.id || 'call_' + Math.random().toString(36).substring(2, 12),
+                'completed',
+                toolCall.function?.name || '',
+                toolCall.function?.arguments || ''
+            ));
+        }
+    }
+    return { ...makeResponseObject(respId, createdTime, 'completed', output, content, usage) };
+}
+
+// ── Register protocol adapters ──
+registerProtocol('chat', {
+    buildRequest(chatPayload, candidate) {
+        const isReasoning = isDeepseekOrReasoningModel(candidate.model, candidate.url);
+        const requestPayload = {
+            ...chatPayload,
+            model: candidate.model
+        };
+        if (!isReasoning) delete requestPayload.reasoning_effort;
+        if (Array.isArray(chatPayload.messages)) {
+            requestPayload.messages = chatPayload.messages.map(m => {
+                if (m.role === 'assistant' && m.reasoning_content !== undefined) {
+                    const newMsg = { ...m };
+                    if (!isReasoning) delete newMsg.reasoning_content;
+                    return newMsg;
+                }
+                return m;
+            });
+        }
+        return {
+            headers: { 'Authorization': 'Bearer ' + (candidate.key || '') },
+            body: JSON.stringify(requestPayload)
+        };
+    },
+    handleStream(upstreamRes, res, ctx) {
+        processChatStream(upstreamRes, res, ctx);
+    },
+    convertNonStream(json, routeModel) {
+        return convertChatToResponses(json, routeModel);
+    }
+});
+
+registerProtocol('anthropic-messages', {
+    buildRequest(chatPayload, candidate, reqBody) {
+        const requestPayload = buildAnthropicPayload(reqBody || { input: '' }, candidate.model);
+        return {
+            headers: {
+                'x-api-key': candidate.key || '',
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify(requestPayload)
+        };
+    },
+    handleStream(upstreamRes, res, ctx) {
+        processAnthropicStream(upstreamRes, res, ctx.respId, ctx.createdTime, ctx.routeModel, ctx.onFinish, ctx.start);
+    },
+    convertNonStream(json, routeModel) {
+        return convertAnthropicToResponses(json, routeModel);
+    }
+});
+
 // ── dispatchWithFailover ──
 function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, lastStatusCode = 502, lastErrorMsg = 'All upstream providers failed', lastUpstreamModel = '', protocol = 'chat', reqBody = null) {
     if (candidateIndex >= candidates.length) {
-        // All candidates failed
         console.error(`[Proxy] All candidates failed. Returning error: ${lastErrorMsg}`);
         sendJSONError(res, lastStatusCode, lastErrorMsg, 'upstream_error', lastStatusCode);
         logRequest('POST', parsedUrl.pathname, lastStatusCode, Date.now() - start, routeModel, lastUpstreamModel, lastErrorMsg);
@@ -820,8 +1151,8 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
     }
 
     const candidate = candidates[candidateIndex];
-    
-    // Log SYS message for Swift RouterManager to parse and show
+    const adapter = adapters[protocol] || adapters['chat'];
+
     console.log(JSON.stringify({
         time: new Date().toTimeString().split(' ')[0],
         method: "SYS",
@@ -833,37 +1164,8 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
         error: `[Proxy] 正在将请求发送至渠道 ${candidateIndex + 1}/${candidates.length}: ${candidate.id} (${candidate.url})`
     }));
 
-    // Build protocol-specific payload
-    const isReasoning = isDeepseekOrReasoningModel(candidate.model, candidate.url);
-    let requestPayload, payloadStr;
-    if (protocol === 'anthropic-messages') {
-        requestPayload = buildAnthropicPayload(reqBody || {}, candidate.model);
-        payloadStr = JSON.stringify(requestPayload);
-    } else {
-        // Chat Completions (default)
-        requestPayload = {
-            ...chatPayload,
-            model: candidate.model
-        };
-        if (!isReasoning) {
-            delete requestPayload.reasoning_effort;
-        }
-        if (Array.isArray(chatPayload.messages)) {
-            requestPayload.messages = chatPayload.messages.map(m => {
-                if (m.role === 'assistant' && m.reasoning_content !== undefined) {
-                    const newMsg = { ...m };
-                    if (!isReasoning) {
-                        delete newMsg.reasoning_content;
-                    }
-                    return newMsg;
-                }
-                return m;
-            });
-        }
-        payloadStr = JSON.stringify(requestPayload);
-    }
+    const { headers: protoHeaders, body: payloadStr } = adapter.buildRequest(chatPayload, candidate, reqBody);
 
-    // Use full URL as-is (no path auto-append)
     const targetUrlStr = candidate.url;
     const parsedTargetUrl = new URL(targetUrlStr);
     const isHttps = parsedTargetUrl.protocol === 'https:';
@@ -871,16 +1173,9 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
 
     const headers = {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payloadStr)
+        'Content-Length': Buffer.byteLength(payloadStr),
+        ...protoHeaders
     };
-    if (candidate.key) {
-        if (protocol === 'anthropic-messages') {
-            headers['x-api-key'] = candidate.key;
-            headers['anthropic-version'] = '2023-06-01';
-        } else {
-            headers['Authorization'] = `Bearer ${candidate.key}`;
-        }
-    }
 
     const requestOptions = {
         hostname: parsedTargetUrl.hostname,
@@ -888,7 +1183,7 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
         path: parsedTargetUrl.pathname + parsedTargetUrl.search,
         method: 'POST',
         headers: headers,
-        timeout: 300000 // 5 minutes timeout
+        timeout: 300000
     };
 
     let streamEnded = false;
@@ -898,118 +1193,47 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
         if (!res.writableFinished && !streamEnded) {
             streamEnded = true;
             console.log(`[Proxy] Client connection closed. Aborting request to candidate ${candidate.id}.`);
-            if (upstreamReq) {
-                upstreamReq.destroy();
-            }
+            if (upstreamReq) upstreamReq.destroy();
         }
     };
     res.on('close', clientCloseHandler);
 
+    const streamEndedRef = { current: false };
+    Object.defineProperty(streamEndedRef, 'current', {
+        get: () => streamEnded,
+        set: (v) => { streamEnded = v; }
+    });
+
     upstreamReq = requester.request(requestOptions, (upstreamRes) => {
         const statusCode = upstreamRes.statusCode;
 
-        // ── Anthropic Messages response ──
-        if (protocol === 'anthropic-messages') {
-            if (stream) {
-                // Anthropic streaming
-                if (statusCode >= 400) {
-                    let errorBody = '';
-                    upstreamRes.on('data', d => { errorBody += d; });
-                    upstreamRes.on('end', () => {
-                        let errorMsg = `Anthropic upstream error: ${statusCode}`;
-                        try { const pe = JSON.parse(errorBody); errorMsg = pe.error?.message || pe.type?.message || errorMsg; } catch (_) {}
-                        if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
-                            res.off('close', clientCloseHandler);
-                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
-                        } else {
-                            sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
-                            logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
-                            onFinish();
-                        }
-                    });
-                    return;
-                }
-                res.writeHead(200, {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                    'Transfer-Encoding': 'chunked',
-                    'X-Accel-Buffering': 'no',
-                    'Access-Control-Allow-Origin': '*'
-                });
-                const rId = 'resp_' + Math.random().toString(36).substring(2, 15);
-                const cTime = Math.floor(Date.now() / 1000);
-                processAnthropicStream(upstreamRes, res, rId, cTime, routeModel, onFinish, start);
-                return;
-            } else {
-                // Anthropic non-streaming
-                let responseData = '';
-                upstreamRes.on('data', chunk => { responseData += chunk; });
-                upstreamRes.on('end', () => {
-                    let json;
-                    try { json = JSON.parse(responseData || '{}'); } catch (err) {
-                        if (candidateIndex + 1 < candidates.length) {
-                            res.off('close', clientCloseHandler);
-                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 500, 'JSON parse failed', candidate.model, protocol, reqBody);
-                        } else {
-                            sendJSONError(res, 500, 'Failed to parse Anthropic response: ' + err.message, 'upstream_parse_error', 500);
-                            onFinish();
-                        }
-                        return;
-                    }
-                    if (statusCode >= 400) {
-                        const errorMsg = json.error?.message || json.type?.message || 'Anthropic upstream error';
-                        if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
-                            res.off('close', clientCloseHandler);
-                            dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
-                        } else {
-                            sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
-                            logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
-                            onFinish();
-                        }
-                        return;
-                    }
-                    const responsesJson = convertAnthropicToResponses(json, routeModel);
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-                    res.end(JSON.stringify(responsesJson));
-                    logRequest('POST', parsedUrl.pathname, 200, Date.now() - start, routeModel, candidate.model);
-                    onFinish();
-                });
-                return;
+        function tryFailover(errorMsg, fallbackStatusCode) {
+            if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
+                res.off('close', clientCloseHandler);
+                dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, fallbackStatusCode, errorMsg, candidate.model, protocol, reqBody);
+                return true;
             }
+            return false;
         }
 
-        // ── Chat Completions response (default) ──
+        function handleError(errorMsg, fallbackStatusCode) {
+            if (tryFailover(errorMsg, fallbackStatusCode)) return;
+            sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
+            logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
+            onFinish();
+        }
+
         if (stream) {
-            // Streaming response conversion
             if (statusCode >= 400) {
                 let errorBody = '';
                 upstreamRes.on('data', d => { errorBody += d; });
                 upstreamRes.on('end', () => {
-                    let errorMsg = `Upstream streaming error: ${statusCode}`;
+                    let errorMsg = `Upstream error: ${statusCode}`;
                     try {
-                        const parsedError = JSON.parse(errorBody);
-                        errorMsg = parsedError.error?.message || errorMsg;
+                        const pe = JSON.parse(errorBody);
+                        errorMsg = pe.error?.message || pe.type?.message || errorMsg;
                     } catch (_) {}
-
-                    if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
-                        console.log(JSON.stringify({
-                            time: new Date().toTimeString().split(' ')[0],
-                            method: "SYS",
-                            path: "",
-                            status: 200,
-                            duration: 0,
-                            model: "",
-                            upstream: "",
-                            error: `[Proxy] 渠道 ${candidate.id} 请求失败 (状态码 ${statusCode}: ${errorMsg})，正在自动尝试备用渠道...`
-                        }));
-                        res.off('close', clientCloseHandler);
-                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
-                    } else {
-                        sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
-                        logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
-                        onFinish();
-                    }
+                    handleError(errorMsg, statusCode);
                 });
                 return;
             }
@@ -1025,461 +1249,37 @@ function dispatchWithFailover(candidates, candidateIndex, chatPayload, stream, r
 
             const respId = 'resp_' + Math.random().toString(36).substring(2, 15);
             const createdTime = Math.floor(Date.now() / 1000);
-            const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
-            let sequenceNumber = 0;
-
-            function writeResponseEvent(eventType, payload) {
-                const eventData = {
-                    type: eventType,
-                    sequence_number: sequenceNumber++,
-                    ...payload
-                };
-                res.write(`event: ${eventType}
-data: ${JSON.stringify(eventData)}
-
-`);
-            }
-
-            let nextOutputIndex = 0;
-            let textOutputIndex = null;
-            let textItemStarted = false;
-            const toolCallStates = new Map();
-
-            function ensureTextItemStarted() {
-                if (textItemStarted) {
-                    return;
-                }
-                textItemStarted = true;
-                textOutputIndex = nextOutputIndex++;
-                writeResponseEvent('response.output_item.added', {
-                    response_id: respId,
-                    output_index: textOutputIndex,
-                    item: makeMessageItem(itemId, 'in_progress', '')
-                });
-                writeResponseEvent('response.content_part.added', {
-                    response_id: respId,
-                    item_id: itemId,
-                    output_index: textOutputIndex,
-                    content_index: 0,
-                    part: makeOutputTextPart('')
-                });
-            }
-
-            function ensureToolCallState(toolCall) {
-                const index = toolCall.index ?? 0;
-                if (toolCallStates.has(index)) {
-                    const existing = toolCallStates.get(index);
-                    if (toolCall.id) existing.callId = toolCall.id;
-                    if (toolCall.function?.name) existing.name = toolCall.function.name;
-                    return existing;
-                }
-                const callId = toolCall.id || `call_${Math.random().toString(36).substring(2, 12)}`;
-                const state = {
-                    itemId: `fc_${Math.random().toString(36).substring(2, 15)}`,
-                    callId,
-                    name: toolCall.function?.name || '',
-                    arguments: '',
-                    outputIndex: nextOutputIndex++
-                };
-                toolCallStates.set(index, state);
-                writeResponseEvent('response.output_item.added', {
-                    response_id: respId,
-                    output_index: state.outputIndex,
-                    item: makeFunctionCallItem(state.itemId, state.callId, 'in_progress', state.name, '')
-                });
-                return state;
-            }
-
-            // Initial event for Responses API
-            writeResponseEvent('response.created', {
-                response: makeResponseObject(respId, createdTime, 'in_progress', [], '', null)
+            adapter.handleStream(upstreamRes, res, {
+                respId, createdTime, routeModel, onFinish, start,
+                candidate, chatPayload, parsedUrl,
+                streamEndedRef, clientCloseHandler,
+                protocol, reqBody, candidates, candidateIndex
             });
-
-            let buffer = '';
-            const decoder = new StringDecoder('utf8');
-            let completionTokens = 0;
-            let promptTokens = 0;
-            let receivedUsage = false;
-            let accumulatedText = '';
-            let accumulatedReasoningContent = '';
-            let thinkBuffer = '';
-
-            function processSSELines(lines) {
-                for (let line of lines) {
-                    line = line.trim();
-                    if (!line) continue;
-                    if (line.startsWith('data:')) {
-                        const dataStr = line.substring(5).trim();
-                        if (dataStr === '[DONE]') {
-                            continue;
-                        }
-                        try {
-                            const json = JSON.parse(dataStr);
-
-                            // Extract usage info if present
-                            if (json.usage) {
-                                promptTokens = json.usage.prompt_tokens || promptTokens;
-                                completionTokens = json.usage.completion_tokens || completionTokens;
-                                receivedUsage = true;
-                            }
-
-                            const choice = json.choices && json.choices[0];
-                            if (choice && choice.delta) {
-                                if (choice.delta.reasoning_content) {
-                                    accumulatedReasoningContent += choice.delta.reasoning_content;
-                                }
-                                // Handle regular content
-                                if (choice.delta.content) {
-                                    const text = choice.delta.content;
-                                    thinkBuffer += text;
-
-                                    while (thinkBuffer.length > 0) {
-                                        const thinkStartIndex = thinkBuffer.indexOf('<think>');
-                                        if (thinkStartIndex !== -1) {
-                                            const thinkEndIndex = thinkBuffer.indexOf('</think>', thinkStartIndex);
-                                            if (thinkEndIndex !== -1) {
-                                                // We found the complete think block.
-                                                const reasoning = thinkBuffer.substring(thinkStartIndex + 7, thinkEndIndex);
-                                                accumulatedReasoningContent += reasoning;
-
-                                                // Extract the text before <think> and after </think>
-                                                const beforeText = thinkBuffer.substring(0, thinkStartIndex);
-                                                if (beforeText) {
-                                                    ensureTextItemStarted();
-                                                    accumulatedText += beforeText;
-                                                    if (!receivedUsage) {
-                                                        completionTokens += Math.max(1, Math.ceil(beforeText.length / 3));
-                                                    }
-                                                    writeResponseEvent('response.output_text.delta', {
-                                                        response_id: respId,
-                                                        item_id: itemId,
-                                                        output_index: textOutputIndex,
-                                                        content_index: 0,
-                                                        delta: beforeText
-                                                    });
-                                                }
-
-                                                // Keep the remaining buffer after </think>
-                                                thinkBuffer = thinkBuffer.substring(thinkEndIndex + 8);
-                                            } else {
-                                                // <think> is found, but </think> is not yet. We must wait for more data.
-                                                // Send anything before <think> to the client immediately.
-                                                const beforeText = thinkBuffer.substring(0, thinkStartIndex);
-                                                if (beforeText) {
-                                                    ensureTextItemStarted();
-                                                    accumulatedText += beforeText;
-                                                    if (!receivedUsage) {
-                                                        completionTokens += Math.max(1, Math.ceil(beforeText.length / 3));
-                                                    }
-                                                    writeResponseEvent('response.output_text.delta', {
-                                                        response_id: respId,
-                                                        item_id: itemId,
-                                                        output_index: textOutputIndex,
-                                                        content_index: 0,
-                                                        delta: beforeText
-                                                    });
-                                                }
-                                                // The buffer now starts from <think>
-                                                thinkBuffer = thinkBuffer.substring(thinkStartIndex);
-                                                break;
-                                            }
-                                        } else {
-                                            // No <think> in buffer.
-                                            // Check if the end of the buffer could be a partial start of "<think>"
-                                            let partialMatchIndex = -1;
-                                            for (let i = 1; i < 7; i++) {
-                                                const suffix = thinkBuffer.substring(thinkBuffer.length - i);
-                                                if ('<think>'.startsWith(suffix)) {
-                                                    partialMatchIndex = thinkBuffer.length - i;
-                                                    break;
-                                                }
-                                            }
-
-                                            if (partialMatchIndex !== -1) {
-                                                // Flush everything except the potential partial match
-                                                const flushText = thinkBuffer.substring(0, partialMatchIndex);
-                                                if (flushText) {
-                                                    ensureTextItemStarted();
-                                                    accumulatedText += flushText;
-                                                    if (!receivedUsage) {
-                                                        completionTokens += Math.max(1, Math.ceil(flushText.length / 3));
-                                                    }
-                                                    writeResponseEvent('response.output_text.delta', {
-                                                        response_id: respId,
-                                                        item_id: itemId,
-                                                        output_index: textOutputIndex,
-                                                        content_index: 0,
-                                                        delta: flushText
-                                                    });
-                                                }
-                                                thinkBuffer = thinkBuffer.substring(partialMatchIndex);
-                                                break;
-                                            } else {
-                                                // No partial match, flush the entire buffer
-                                                ensureTextItemStarted();
-                                                accumulatedText += thinkBuffer;
-                                                if (!receivedUsage) {
-                                                    completionTokens += Math.max(1, Math.ceil(thinkBuffer.length / 3));
-                                                }
-                                                writeResponseEvent('response.output_text.delta', {
-                                                    response_id: respId,
-                                                    item_id: itemId,
-                                                    output_index: textOutputIndex,
-                                                    content_index: 0,
-                                                    delta: thinkBuffer
-                                                });
-                                                thinkBuffer = '';
-                                            }
-                                        }
-                                    }
-                                }
-                                if (Array.isArray(choice.delta.tool_calls)) {
-                                    for (const toolCall of choice.delta.tool_calls) {
-                                        const state = ensureToolCallState(toolCall);
-                                        if (toolCall.function?.name) {
-                                            state.name = toolCall.function.name;
-                                        }
-                                        const argDelta = toolCall.function?.arguments || '';
-                                        if (argDelta) {
-                                            state.arguments += argDelta;
-                                            writeResponseEvent('response.function_call_arguments.delta', {
-                                                response_id: respId,
-                                                item_id: state.itemId,
-                                                output_index: state.outputIndex,
-                                                delta: argDelta
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (_) {}
-                    }
-                }
-            }
-
-            const streamTimeout = setTimeout(() => {
-                if (streamEnded) return;
-                streamEnded = true;
-                console.error('[Proxy] Chat stream inactivity timeout');
-                sendJSONError(res, 502, 'Upstream stream inactivity timeout', 'upstream_stream_timeout', 502);
-                upstreamReq.destroy();
-                onFinish();
-            }, CONFIG.streamInactivityTimeoutMs);
-
-            upstreamRes.on('data', (chunk) => {
-                streamTimeout.refresh();
-                buffer += decoder.write(chunk);
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-                processSSELines(lines);
-            });
-
-            upstreamRes.on('end', () => {
-                if (streamEnded) return;
-                streamEnded = true;
-                clearTimeout(streamTimeout);
-
-                // Flush remaining buffer
-                buffer += decoder.end();
-                if (buffer.trim()) {
-                    processSSELines(buffer.split('\n'));
-                }
-
-                // Estimate prompt tokens if not provided by upstream
-                if (!promptTokens) {
-                    promptTokens = Math.ceil(chatPayload.messages.reduce((acc, m) => {
-                        if (typeof m.content === 'string') {
-                            return acc + m.content.length / 3;
-                        } else if (Array.isArray(m.content)) {
-                            const textLength = m.content.reduce((sum, part) => {
-                                if (part && part.text) {
-                                    return sum + part.text.length;
-                                }
-                                return sum;
-                            }, 0);
-                            return acc + textLength / 3;
-                        }
-                        return acc;
-                    }, 0));
-                }
-                if (!completionTokens && accumulatedText) {
-                    completionTokens = Math.ceil(accumulatedText.length / 3);
-                }
-
-                const usage = normalizeUsage(null, promptTokens, completionTokens);
-                const completedOutput = [];
-
-                if (textItemStarted) {
-                    rememberReasoningContent(itemId, accumulatedReasoningContent);
-                    const finalPart = makeOutputTextPart(accumulatedText);
-                    const finalItem = makeMessageItem(itemId, 'completed', accumulatedText);
-                    completedOutput[textOutputIndex] = finalItem;
-
-                    writeResponseEvent('response.output_text.done', {
-                        response_id: respId,
-                        item_id: itemId,
-                        output_index: textOutputIndex,
-                        content_index: 0,
-                        text: accumulatedText
-                    });
-
-                    writeResponseEvent('response.content_part.done', {
-                        response_id: respId,
-                        item_id: itemId,
-                        output_index: textOutputIndex,
-                        content_index: 0,
-                        part: finalPart
-                    });
-
-                    writeResponseEvent('response.output_item.done', {
-                        response_id: respId,
-                        output_index: textOutputIndex,
-                        item: finalItem
-                    });
-                }
-
-                for (const state of Array.from(toolCallStates.values()).sort((a, b) => a.outputIndex - b.outputIndex)) {
-                    rememberReasoningContent(state.callId, accumulatedReasoningContent);
-                    const finalToolItem = makeFunctionCallItem(state.itemId, state.callId, 'completed', state.name, state.arguments);
-                    completedOutput[state.outputIndex] = finalToolItem;
-                    writeResponseEvent('response.function_call_arguments.done', {
-                        response_id: respId,
-                        item_id: state.itemId,
-                        output_index: state.outputIndex,
-                        arguments: state.arguments
-                    });
-                    writeResponseEvent('response.output_item.done', {
-                        response_id: respId,
-                        output_index: state.outputIndex,
-                        item: finalToolItem
-                    });
-                }
-
-                // Send response.completed last.
-                writeResponseEvent('response.completed', {
-                    response: makeResponseObject(
-                        respId,
-                        createdTime,
-                        'completed',
-                        completedOutput.filter(Boolean),
-                        accumulatedText,
-                        usage
-                    )
-                });
-
-                res.end();
-                logRequest('POST', parsedUrl.pathname, 200, Date.now() - start, routeModel, candidate.model);
-                onFinish();
-            });
-
-            upstreamRes.on('error', (err) => {
-                if (streamEnded) return;
-                streamEnded = true;
-                clearTimeout(streamTimeout);
-                console.error('[Proxy] Upstream response error during streaming:', err.message);
-                sendJSONError(res, 502, 'Upstream stream error: ' + err.message, 'upstream_stream_error', 502);
-                logRequest('POST', parsedUrl.pathname, 502, Date.now() - start, routeModel, candidate.model, 'Stream error: ' + err.message);
-                onFinish();
-            });
-
         } else {
-            // Non-streaming response conversion
             let responseData = '';
-            upstreamRes.on('data', chunk => {
-                responseData += chunk;
-            });
-
+            upstreamRes.on('data', chunk => { responseData += chunk; });
             upstreamRes.on('end', () => {
                 let json;
                 try {
                     json = JSON.parse(responseData || '{}');
                 } catch (err) {
                     if (candidateIndex + 1 < candidates.length) {
-                        console.log(JSON.stringify({
-                            time: new Date().toTimeString().split(' ')[0],
-                            method: "SYS",
-                            path: "",
-                            status: 200,
-                            duration: 0,
-                            model: "",
-                            upstream: "",
-                            error: `[Proxy] 渠道 ${candidate.id} 返回非 JSON 数据，正在尝试下一个备用渠道...`
-                        }));
                         res.off('close', clientCloseHandler);
                         dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, 500, 'JSON parse failed', candidate.model, protocol, reqBody);
                     } else {
-                        sendJSONError(res, 500, 'Failed to parse upstream response: ' + err.message, 'upstream_parse_error', 500);
-                        logRequest('POST', parsedUrl.pathname, 500, Date.now() - start, routeModel, candidate.model, 'Upstream response not JSON');
+                        sendJSONError(res, 500, 'Failed to parse response: ' + err.message, 'upstream_parse_error', 500);
                         onFinish();
                     }
                     return;
                 }
 
                 if (statusCode >= 400) {
-                    const errorMsg = json.error?.message || 'Upstream server returned error';
-                    if (isFailoverableStatus(statusCode) && candidateIndex + 1 < candidates.length) {
-                        console.log(JSON.stringify({
-                            time: new Date().toTimeString().split(' ')[0],
-                            method: "SYS",
-                            path: "",
-                            status: 200,
-                            duration: 0,
-                            model: "",
-                            upstream: "",
-                            error: `[Proxy] 渠道 ${candidate.id} 请求失败 (状态码 ${statusCode}: ${errorMsg})，正在自动尝试备用渠道...`
-                        }));
-                        res.off('close', clientCloseHandler);
-                        dispatchWithFailover(candidates, candidateIndex + 1, chatPayload, stream, res, req, parsedUrl, start, routeModel, onFinish, statusCode, errorMsg, candidate.model, protocol, reqBody);
-                    } else {
-                        sendJSONError(res, statusCode, errorMsg, 'upstream_error', statusCode);
-                        logRequest('POST', parsedUrl.pathname, statusCode, Date.now() - start, routeModel, candidate.model, errorMsg);
-                        onFinish();
-                    }
+                    handleError(json.error?.message || json.type?.message || 'Upstream server error', statusCode);
                     return;
                 }
 
-                const message = json.choices && json.choices[0] && json.choices[0].message || {};
-                let content = message.content || '';
-                let reasoningContent = message.reasoning_content || '';
-                if (content.includes('<think>')) {
-                    const match = content.match(/<think>([\s\S]*?)<\/think>/);
-                    if (match) {
-                        reasoningContent = match[1];
-                        content = content.replace(/<think>[\s\S]*?<\/think>\n?/g, '');
-                    }
-                }
-                const usage = normalizeUsage(json.usage, 0, 0);
-                const respId = 'resp_' + Math.random().toString(36).substring(2, 15);
-                const itemId = 'msg_' + Math.random().toString(36).substring(2, 15);
-                const createdTime = Math.floor(Date.now() / 1000);
-                const output = [];
-                if (content) {
-                    if (reasoningContent) {
-                        rememberReasoningContent(itemId, reasoningContent);
-                    }
-                    output.push(makeMessageItem(itemId, 'completed', content));
-                }
-                if (Array.isArray(message.tool_calls)) {
-                    for (const toolCall of message.tool_calls) {
-                        rememberReasoningContent(toolCall.id, message.reasoning_content || reasoningContent);
-                        output.push(makeFunctionCallItem(
-                            `fc_${Math.random().toString(36).substring(2, 15)}`,
-                            toolCall.id || `call_${Math.random().toString(36).substring(2, 12)}`,
-                            'completed',
-                            toolCall.function?.name || '',
-                            toolCall.function?.arguments || ''
-                        ));
-                    }
-                }
-
-                const responsesJson = {
-                    ...makeResponseObject(respId, createdTime, 'completed', output, content, usage)
-                };
-
-                res.writeHead(200, {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                });
+                const responsesJson = adapter.convertNonStream(json, routeModel);
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                 res.end(JSON.stringify(responsesJson));
                 logRequest('POST', parsedUrl.pathname, 200, Date.now() - start, routeModel, candidate.model);
                 onFinish();
@@ -1490,7 +1290,6 @@ data: ${JSON.stringify(eventData)}
     upstreamReq.on('error', (err) => {
         if (streamEnded) return;
         streamEnded = true;
-
         if (candidateIndex + 1 < candidates.length) {
             console.log(JSON.stringify({
                 time: new Date().toTimeString().split(' ')[0],
