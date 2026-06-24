@@ -235,6 +235,94 @@ test('buildAnthropicPayload: tool_use followed by user text absorbs synthetic to
     assert.strictEqual(synthetic.tool_use_id, 'call_abc');
 });
 
+test('buildAnthropicPayload: tool_use in content array of assistant message is extracted', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { role: 'user', content: 'weather?' },
+            { role: 'assistant', content: [{ type: 'text', text: 'Checking...' }, { type: 'tool_use', id: 'call_tc1', name: 'get_weather', input: { city: 'NYC' } }] },
+            { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_tc1', content: '72°F' }] }
+        ]
+    }, 'claude-3');
+    // assistant should have text + tool_use
+    const assistant = r.messages.find(m => m.role === 'assistant');
+    assert.ok(assistant, 'assistant message should exist');
+    const tu = assistant.content.find(c => c.type === 'tool_use');
+    assert.ok(tu, 'tool_use should be extracted from content array');
+    assert.strictEqual(tu.id, 'call_tc1');
+    const user = r.messages.find(m => m.role === 'user' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_result'));
+    assert.ok(user, 'user with tool_result should exist');
+    const tr = user.content.find(c => c.type === 'tool_result');
+    assert.strictEqual(tr.tool_use_id, 'call_tc1');
+    assert.strictEqual(tr.content, '72°F');
+});
+
+test('buildAnthropicPayload: tool_use in content without matching tool_result gets synthetic', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'orphan_tc2', name: 'search', input: { q: 'test' } }] },
+            { role: 'user', content: 'no result here' }
+        ]
+    }, 'claude-3');
+    const assistant = r.messages.find(m => m.role === 'assistant');
+    assert.ok(assistant.content.some(c => c.type === 'tool_use' && c.id === 'orphan_tc2'));
+    // The next user message should absorb a synthetic tool_result
+    const userIdx = r.messages.findIndex(m => m.role === 'user');
+    const next = r.messages[userIdx];
+    assert.ok(next.content.some(c => c.type === 'tool_result' && c.tool_use_id === 'orphan_tc2'), 'synthetic tool_result should be present');
+});
+
+test('buildAnthropicPayload: tool_use in content followed by function_call_output works', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_mix', name: 'get_time', input: {} }] },
+            { type: 'function_call_output', call_id: 'call_mix', output: '3pm' }
+        ]
+    }, 'claude-3');
+    const user = r.messages.find(m => m.role === 'user');
+    assert.ok(user, 'user message should exist');
+    assert.ok(Array.isArray(user.content), 'user content should be array');
+    const tr = user.content.find(c => c.type === 'tool_result');
+    assert.ok(tr, 'tool_result should exist');
+    assert.strictEqual(tr.tool_use_id, 'call_mix');
+    assert.strictEqual(tr.content, '3pm');
+});
+
+test('buildAnthropicPayload: tool_use in content with mixed function_call items', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { role: 'user', content: 'do X' },
+            { type: 'function_call', call_id: 'fc_1', name: 'tool_a', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'fc_1', output: 'a ok' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'fc_2', name: 'tool_b', input: {} }] },
+            { type: 'function_call_output', call_id: 'fc_2', output: 'b ok' }
+        ]
+    }, 'claude-3');
+    // Should produce: user, assistant(fc_1), user(fc_1 result), assistant(fc_2), user(fc_2 result)
+    assert.strictEqual(r.messages.length, 5, '5 messages for two complete tool cycles');
+    assert.strictEqual(r.messages[3].role, 'assistant');
+    assert.strictEqual(r.messages[3].content[0].type, 'tool_use');
+    assert.strictEqual(r.messages[3].content[0].id, 'fc_2');
+    assert.strictEqual(r.messages[4].role, 'user');
+    assert.strictEqual(r.messages[4].content[0].type, 'tool_result');
+    assert.strictEqual(r.messages[4].content[0].tool_use_id, 'fc_2');
+});
+
+test('buildAnthropicPayload: tool_use in content without following item at end gets synthetic', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { role: 'user', content: 'hello' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'last_tc', name: 'final_tool', input: {} }] }
+        ]
+    }, 'claude-3');
+    // Assistant with tool_use must be immediately followed by a user with tool_result
+    const lastTwo = r.messages.slice(-2);
+    assert.strictEqual(lastTwo[0].role, 'assistant', 'second-to-last should be assistant');
+    assert.strictEqual(lastTwo[0].content[0].type, 'tool_use');
+    assert.strictEqual(lastTwo[1].role, 'user', 'last should be user with synthetic tool_result');
+    assert.strictEqual(lastTwo[1].content[0].type, 'tool_result');
+    assert.strictEqual(lastTwo[1].content[0].tool_use_id, 'last_tc');
+});
+
 test('buildAnthropicPayload: tools converted to Anthropic format', () => {
     const r = buildAnthropicPayload({
         input: 'Hi',

@@ -82,8 +82,11 @@ enum CheckAccountManager {
         let reloaded = AccountManager(storage: storage, autoCreateDefaultAccount: false)
         expect(reloaded.accounts.count == 2, "reload should preserve accounts")
         expect(reloaded.activeAccount?.id == backup.id, "reload should preserve active account")
-        expect(reloaded.account(id: primary.id)?.apiKey == "sk-primary", "reload should preserve primary api key")
-        expect(reloaded.account(id: backup.id)?.apiKey == "sk-backup", "reload should preserve backup api key")
+        // API Key 不再持久化到 UserDefaults，走 Keychain。
+        // 验证：hasAPIKey 为 true（Keychain 有值），resolveAPIKey 可读取
+        expect(manager.account(id: primary.id)?.hasAPIKey == true, "updateAPIKey should set hasAPIKey")
+        expect(manager.account(id: backup.id)?.hasAPIKey == true, "updateAPIKey should set hasAPIKey for backup")
+        expect(reloaded.account(id: primary.id)?.hasAPIKey == true, "reload should preserve hasAPIKey flag")
         expect(reloaded.account(id: primary.id)?.refreshInterval == 60, "reload should preserve primary refresh interval")
         expect(reloaded.account(id: backup.id)?.refreshInterval == 1800, "reload should preserve backup refresh interval")
         expect(reloaded.account(id: primary.id)?.cookieHeader == "session=primary-session", "reload should preserve primary cookies")

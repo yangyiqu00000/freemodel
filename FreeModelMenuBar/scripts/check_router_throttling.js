@@ -60,7 +60,7 @@ function requestJSON(options, body) {
   const proxyPort = await listen(proxy);
   proxy.close();
 
-  const sidecarPath = path.join(process.cwd(), 'FreeModelMenuBar', 'router_sidecar.js');
+  const sidecarPath = path.join(process.cwd(), 'FreeModelMenuBar', 'FreeModelMenuBar', 'router_sidecar.js');
   const child = spawn(process.execPath, [sidecarPath], {
     env: {
       ...process.env,

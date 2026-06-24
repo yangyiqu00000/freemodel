@@ -380,7 +380,7 @@ struct AccountSettingsView: View {
     private func loadFromAccount() {
         renameText = account?.displayName ?? ""
         initialDisplayName = account?.displayName ?? ""
-        apiKeyInput = account?.apiKey ?? ""
+        apiKeyInput = accountManager.resolveAPIKey(for: accountID) ?? ""
         apiKeyStatus = .unsaved
     }
 

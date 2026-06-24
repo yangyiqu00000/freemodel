@@ -653,6 +653,16 @@ function buildAnthropicPayload(reqBody, modelName) {
                                 if (c.input_text !== undefined) { c.text = c.input_text; delete c.input_text; }
                                 delete c.input_audio; delete c.input_image;
                                 if (c.type === 'text' && c.text) currentText += (currentText ? '\n' : '') + c.text;
+                                if (c.type === 'tool_use' && c.id && c.name) {
+                                    currentTools.push({ type: 'tool_use', id: c.id, name: c.name, input: c.input || {} });
+                                }
+                                if (c.type === 'tool_result' && c.tool_use_id) {
+                                    currentResults.push({
+                                        type: 'tool_result',
+                                        tool_use_id: c.tool_use_id,
+                                        content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? '')
+                                    });
+                                }
                             }
                         }
                     }
@@ -662,6 +672,27 @@ function buildAnthropicPayload(reqBody, modelName) {
         }
         flushTurn();
         flushPendingToolResults();
+    }
+
+    // ── Final safety net: ensure every tool_use has a tool_result in the next message ──
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+        const toolUses = msg.content.filter(c => c.type === 'tool_use');
+        if (!toolUses.length) continue;
+        const next = messages[i + 1];
+        if (!next || next.role !== 'user' || !Array.isArray(next.content)) {
+            messages.splice(i + 1, 0, {
+                role: 'user',
+                content: toolUses.map(t => makeSyntheticToolResult(t.id))
+            });
+            continue;
+        }
+        const nextResultIds = new Set(next.content.filter(c => c.type === 'tool_result').map(c => c.tool_use_id));
+        const missing = toolUses.filter(t => !nextResultIds.has(t.id));
+        if (missing.length) {
+            next.content.push(...missing.map(t => makeSyntheticToolResult(t.id)));
+        }
     }
 
     // ── Tools ──

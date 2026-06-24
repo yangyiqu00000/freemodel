@@ -166,7 +166,7 @@ final class RouterManager: ObservableObject {
         let settings = account.activeRouterSettings
 
         // Validation 1: Upstream Key
-        guard account.hasAPIKey, let apiKey = account.apiKey, !apiKey.isEmpty else {
+        guard account.hasAPIKey, let apiKey = accountManager.resolveAPIKey(for: account.id), !apiKey.isEmpty else {
             status = .missingKey
             appendLog("启动失败：当前账号未配置 API Key。")
             return
@@ -591,15 +591,14 @@ final class RouterManager: ObservableObject {
         var backupInfos: [[String: String]] = []
         let backupAccounts = accountManager.accounts.filter {
             $0.id != activeAccount.id &&
-            $0.hasAPIKey &&
-            !($0.apiKey ?? "").isEmpty
+            $0.hasAPIKey
         }
         for p in backupAccounts {
             let backupSettings = p.activeRouterSettings
             backupInfos.append([
                 "providerID": p.providerID,
                 "url": backupSettings.upstreamBaseURL,
-                "key": p.apiKey ?? "",
+                "key": accountManager.resolveAPIKey(for: p.id) ?? "",
                 "model": backupSettings.defaultModel
             ])
         }
@@ -610,7 +609,7 @@ final class RouterManager: ObservableObject {
             "activeAccount": [
                 "providerID": activeAccount.providerID,
                 "url": settings.upstreamBaseURL,
-                "key": activeAccount.apiKey ?? "",
+                "key": accountManager.resolveAPIKey(for: activeAccount.id) ?? "",
                 "model": settings.defaultModel
             ],
             "backups": backupInfos,

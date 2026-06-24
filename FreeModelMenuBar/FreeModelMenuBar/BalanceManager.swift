@@ -35,10 +35,11 @@ class BalanceManager: ObservableObject {
 
     // MARK: - API Key 管理
 
-    /// 从当前账号读取 API Key
+    /// 从当前账号读取 API Key（通过 Keychain）
     var apiKey: String? {
         get {
-            accountManager.activeAccount?.apiKey
+            guard let activeID = accountManager.activeAccountID else { return nil }
+            return accountManager.resolveAPIKey(for: activeID)
         }
         set {
             guard let activeAccount = accountManager.activeAccount else { return }

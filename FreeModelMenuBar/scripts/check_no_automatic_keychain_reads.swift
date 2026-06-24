@@ -3,8 +3,10 @@ import Foundation
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let balanceManagerURL = root
     .appendingPathComponent("FreeModelMenuBar")
+    .appendingPathComponent("FreeModelMenuBar")
     .appendingPathComponent("BalanceManager.swift")
 let settingsViewURL = root
+    .appendingPathComponent("FreeModelMenuBar")
     .appendingPathComponent("FreeModelMenuBar")
     .appendingPathComponent("SettingsView.swift")
 

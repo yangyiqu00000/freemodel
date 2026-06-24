@@ -2,8 +2,8 @@
 import Foundation
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-let appPath = root.appendingPathComponent("FreeModelMenuBar/FreeModelMenuBarApp.swift")
-let menuPath = root.appendingPathComponent("FreeModelMenuBar/MenuContent.swift")
+let appPath = root.appendingPathComponent("FreeModelMenuBar").appendingPathComponent("FreeModelMenuBar").appendingPathComponent("FreeModelMenuBarApp.swift")
+let menuPath = root.appendingPathComponent("FreeModelMenuBar").appendingPathComponent("FreeModelMenuBar").appendingPathComponent("MenuContent.swift")
 
 let appSource = try String(contentsOf: appPath, encoding: .utf8)
 let menuSource = try String(contentsOf: menuPath, encoding: .utf8)
@@ -21,7 +21,7 @@ guard menuSource.contains("SettingsWindowController.shared.openSettings("),
     exit(1)
 }
 
-let controllerPath = root.appendingPathComponent("FreeModelMenuBar/SettingsWindowController.swift")
+let controllerPath = root.appendingPathComponent("FreeModelMenuBar").appendingPathComponent("FreeModelMenuBar").appendingPathComponent("SettingsWindowController.swift")
 let controllerSource = try String(contentsOf: controllerPath, encoding: .utf8)
 
 guard controllerSource.contains("@MainActor") else {

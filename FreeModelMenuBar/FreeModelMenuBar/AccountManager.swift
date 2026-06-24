@@ -261,6 +261,11 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
         case id, providerID, displayName, apiBaseURL, dashboardURL, cookieRecords, apiKeyKeychainID, hasAPIKey, lastBalance, lastRefreshDate, queryMode, refreshInterval, apiKey, routerSettings, createdAt, updatedAt
     }
 
+    /// 编码时使用的 keys（排除 apiKey — 它走 Keychain，不落在 UserDefaults 里）
+    private enum EncodingKeys: String, CodingKey {
+        case id, providerID, displayName, apiBaseURL, dashboardURL, cookieRecords, apiKeyKeychainID, hasAPIKey, lastBalance, lastRefreshDate, queryMode, refreshInterval, routerSettings, createdAt, updatedAt
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -282,7 +287,7 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
     }
 
     func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(providerID, forKey: .providerID)
         try container.encode(displayName, forKey: .displayName)
@@ -295,11 +300,14 @@ struct ProviderAccount: Codable, Equatable, Identifiable {
         try container.encodeIfPresent(lastRefreshDate, forKey: .lastRefreshDate)
         try container.encode(queryMode, forKey: .queryMode)
         try container.encode(refreshInterval, forKey: .refreshInterval)
-        try container.encodeIfPresent(apiKey, forKey: .apiKey)
         try container.encodeIfPresent(routerSettings, forKey: .routerSettings)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
     }
+
+    /// 从旧数据解码后，清理内存中的 apiKey（已迁移到 Keychain），避免反序列化时泄露。
+    /// AccountManager.init 中会在加载后统一调用 migrateAPIKeysFromStorage()。
+    /// 解码时保留 apiKey 是为了兼容旧版 UserDefaults 存储格式。
 
     var activeRouterSettings: RouterSettings {
         let upstreamURL: String
@@ -398,8 +406,9 @@ final class AccountManager: ObservableObject {
     @Published private(set) var activeAccountID: UUID?
 
     private let storage: AccountStorage
+    private let appKeychain: AppKeychainStore
 
-    init(storage: AccountStorage = UserDefaultsAccountStorage(), autoCreateDefaultAccount: Bool = true) {
+    init(storage: AccountStorage = UserDefaultsAccountStorage(), appKeychain: AppKeychainStore = AppKeychainStore(), autoCreateDefaultAccount: Bool = true) {
         self.storage = storage
 
         if let state = storage.loadState() {
@@ -409,6 +418,8 @@ final class AccountManager: ObservableObject {
             self.accounts = []
             self.activeAccountID = nil
         }
+
+        self.appKeychain = appKeychain
 
         if accounts.isEmpty && autoCreateDefaultAccount {
             let account = ProviderAccount(displayName: "FreeModel 1")
@@ -422,6 +433,9 @@ final class AccountManager: ObservableObject {
             activeAccountID = accounts.first?.id
             persist()
         }
+
+        // 迁移旧版 UserDefaults 中存储的 API Key 到 Keychain
+        migrateAPIKeysFromStorage()
     }
 
     var activeAccount: ProviderAccount? {
@@ -464,7 +478,21 @@ final class AccountManager: ObservableObject {
     }
 
     func moveAccount(fromOffsets source: IndexSet, toOffset destination: Int) {
-        accounts.move(fromOffsets: source, toOffset: destination)
+        // 手动实现（替代 SwiftUI 的 move(fromOffsets:toOffset:)），避免 CLI 测试时依赖 SwiftUI
+        let sortedIndices = source.sorted()
+        let movedItems = sortedIndices.map { accounts[$0] }
+        for index in sortedIndices.reversed() {
+            accounts.remove(at: index)
+        }
+        let insertAt: Int
+        if let first = sortedIndices.first, destination > first {
+            insertAt = destination - movedItems.count
+        } else {
+            insertAt = destination
+        }
+        for (offset, item) in movedItems.enumerated() {
+            accounts.insert(item, at: insertAt + offset)
+        }
         persist()
     }
 
@@ -481,6 +509,8 @@ final class AccountManager: ObservableObject {
     func deleteAccount(id: UUID) -> ProviderAccount? {
         guard let index = accounts.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = accounts.remove(at: index)
+        // 同时清理 Keychain 中的 API Key
+        try? appKeychain.delete(account: removed.apiKeyKeychainID)
         if activeAccountID == id {
             activeAccountID = accounts.first?.id
         }
@@ -552,16 +582,29 @@ final class AccountManager: ObservableObject {
     }
 
     func updateAPIKey(_ key: String?, for id: UUID) {
-        updateAccount(id: id) { account in
-            let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed?.isEmpty ?? true {
-                account.apiKey = nil
-                account.hasAPIKey = false
-            } else {
-                account.apiKey = trimmed
-                account.hasAPIKey = true
+        let keychainID = apiKeyStorageKey(for: id) ?? "freemodel_api_key_\(id.uuidString)"
+        let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed?.isEmpty ?? true {
+            // 清除 Keychain 中的 API Key
+            try? appKeychain.delete(account: keychainID)
+            setAPIKeyConfigured(false, for: id)
+        } else {
+            // 写入 Keychain
+            do {
+                try appKeychain.save(apiKey: trimmed!, account: keychainID)
+                setAPIKeyConfigured(true, for: id)
+            } catch {
+                print("Keychain save failed: \(error)")
             }
         }
+    }
+
+    /// 从 Keychain 读取指定账号的 API Key。
+    /// 返回 nil = 未配置或读取失败。
+    func resolveAPIKey(for id: UUID) -> String? {
+        guard let keychainID = apiKeyStorageKey(for: id) else { return nil }
+        return try? appKeychain.load(account: keychainID)
     }
 
     func updateRouterSettings(_ settings: RouterSettings, for id: UUID) {
@@ -589,5 +632,31 @@ final class AccountManager: ObservableObject {
 
     private func persist() {
         storage.saveState(AccountState(accounts: accounts, activeAccountID: activeAccountID))
+    }
+
+    /// 从 UserDefaults 解码的旧数据中提取 apiKey，迁移到 Keychain。
+    /// 迁移后清除内存中的 apiKey，并重写存储（encode 时已排除 apiKey）。
+    private func migrateAPIKeysFromStorage() {
+        var needsRepersist = false
+        for i in accounts.indices {
+            guard let oldKey = accounts[i].apiKey, !oldKey.isEmpty else { continue }
+            let keychainID = accounts[i].apiKeyKeychainID
+            // 仅在 Keychain 中还不存在时写入
+            if (try? appKeychain.load(account: keychainID)) == nil {
+                do {
+                    try appKeychain.save(apiKey: oldKey, account: keychainID)
+                    accounts[i].hasAPIKey = true
+                    print("Migrated API Key for \(accounts[i].displayName) to Keychain")
+                } catch {
+                    print("Failed to migrate API Key: \(error)")
+                }
+            }
+            // 清理内存中的明文
+            accounts[i].apiKey = nil
+            needsRepersist = true
+        }
+        if needsRepersist {
+            persist()
+        }
     }
 }
