@@ -100,7 +100,7 @@ function parseSSE(body) {
     env: {
       ...process.env,
       PORT: String(proxyPort),
-      UPSTREAM_BASE_URL: `http://127.0.0.1:${upstreamPort}`,
+      UPSTREAM_BASE_URL: `http://127.0.0.1:${upstreamPort}/chat/completions`,
       UPSTREAM_API_KEY: 'test-key',
       UPSTREAM_MODEL: 'fake-upstream',
       ROUTE_MODEL: 'codex-mini'
