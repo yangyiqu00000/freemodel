@@ -189,14 +189,8 @@ final class RouterManager: ObservableObject {
 
             // Locate sidecar script
             guard let scriptPath = Bundle.main.path(forResource: "router_sidecar", ofType: "js") else {
-                // Fallback for development/debug environments
-                let devPath = "/Users/yyq/Library/Application Support/TRAE SOLO CN/ModularData/ai-agent/work-mode-projects/6a167704dad46ec56f2b1566/FreeModelMenuBar/FreeModelMenuBar/router_sidecar.js"
-                if FileManager.default.fileExists(atPath: devPath) {
-                    self.launchProcess(scriptPath: devPath, port: settings.port, apiKey: apiKey, settings: settings, activeAccount: account)
-                } else {
-                    self.status = .failed
-                    self.appendLog("错误：未能在 App Bundle 或本地路径中找到 router_sidecar.js")
-                }
+                self.status = .failed
+                self.appendLog("错误：未能在 App Bundle 中找到 router_sidecar.js（预期在 Resources 目录下）")
                 return
             }
 
