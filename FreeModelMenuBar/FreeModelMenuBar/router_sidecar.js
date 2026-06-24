@@ -362,11 +362,23 @@ function makeToolMessage(toolCallId, content) {
 }
 
 function makeSyntheticMissingToolMessage(toolCallId) {
-    return makeToolMessage(toolCallId, JSON.stringify({
+    return makeToolMessage(toolCallId, makeSyntheticMissingToolContent(toolCallId));
+}
+
+function makeSyntheticToolResult(toolCallId) {
+    return {
+        type: 'tool_result',
+        tool_use_id: toolCallId,
+        content: makeSyntheticMissingToolContent(toolCallId)
+    };
+}
+
+function makeSyntheticMissingToolContent(toolCallId) {
+    return JSON.stringify({
         error: 'missing_from_restored_history',
         message: 'The tool result for this call was not present in restored conversation history. Continue without relying on the missing result.',
         tool_call_id: toolCallId
-    }));
+    });
 }
 
 function normalizeResponsesTool(tool) {
@@ -531,6 +543,9 @@ function buildAnthropicPayload(reqBody, modelName) {
     let currentTools = [];      // tool_use blocks for assistant
     let currentResults = [];    // tool_result blocks for user
     let hasContent = false;
+    // Track tool_use ids in the last assistant turn that still lack a matching tool_result.
+    // Anthropic requires every tool_use to be immediately followed by its tool_result.
+    let pendingToolUseIds = [];
 
     function flushTurn() {
         if (!currentRole || !hasContent) return;
@@ -538,9 +553,28 @@ function buildAnthropicPayload(reqBody, modelName) {
         if (currentText) content.push({ type: 'text', text: currentText });
         content.push(...currentTools);
         content.push(...currentResults);
+
+        if (currentRole === 'user' && currentResults.length && pendingToolUseIds.length) {
+            // Anthropic requires every tool_use from the previous assistant turn to have a
+            // tool_result in the immediately following user message. Absorb any still-unanswered
+            // ids into this same user message so they stay adjacent.
+            const answered = new Set(currentResults.map(r => r.tool_use_id));
+            for (const id of pendingToolUseIds) {
+                if (answered.has(id)) continue;
+                content.push(makeSyntheticToolResult(id));
+            }
+            pendingToolUseIds = [];
+        }
+
         // Single text-only message → use plain string
         const finalContent = content.length === 1 && content[0].type === 'text' ? content[0].text : content;
         messages.push({ role: currentRole, content: finalContent });
+
+        // Remember tool_use ids needing a result.
+        if (currentRole === 'assistant' && currentTools.length) {
+            pendingToolUseIds = currentTools.map(t => t.id);
+        }
+
         // Reset accumulators
         currentText = '';
         currentTools = [];
@@ -548,9 +582,25 @@ function buildAnthropicPayload(reqBody, modelName) {
         hasContent = false;
     }
 
+    // Synthesize a tool_result for any tool_use that left the assistant turn without one,
+    // so the upstream Anthropic API never sees tool_use without a following tool_result.
+    function flushPendingToolResults() {
+        if (!pendingToolUseIds.length) return;
+        messages.push({
+            role: 'user',
+            content: pendingToolUseIds.map(id => makeSyntheticToolResult(id))
+        });
+        pendingToolUseIds = [];
+    }
+
     function ensureTurn(role) {
         if (currentRole !== role) {
             flushTurn();
+            // Only fill standalone when the next turn is NOT a user turn (which would absorb
+            // the missing results itself). Avoids duplicating results the user turn provides.
+            if (currentRole === 'assistant' && role !== 'user') {
+                flushPendingToolResults();
+            }
             currentRole = role;
         }
     }
@@ -611,6 +661,7 @@ function buildAnthropicPayload(reqBody, modelName) {
             }
         }
         flushTurn();
+        flushPendingToolResults();
     }
 
     // ── Tools ──

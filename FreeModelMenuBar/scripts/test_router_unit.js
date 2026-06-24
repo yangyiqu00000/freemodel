@@ -91,16 +91,20 @@ test('buildAnthropicPayload: multiple strings grouped into one user turn', () =>
     assert.strictEqual(r.messages[0].content, 'Hello\nWorld');
 });
 
-test('buildAnthropicPayload: function_call mapped to tool_use', () => {
+test('buildAnthropicPayload: function_call mapped to tool_use (missing result synthesized)', () => {
     const r = buildAnthropicPayload({
         input: [{ type: 'function_call', call_id: 'c1', name: 'get_weather', arguments: '{"city":"NYC"}' }]
     }, 'claude-3');
-    assert.strictEqual(r.messages.length, 1);
+    // assistant tool_use must be immediately followed by a user tool_result
+    assert.strictEqual(r.messages.length, 2);
     assert.strictEqual(r.messages[0].role, 'assistant');
     assert.strictEqual(r.messages[0].content[0].type, 'tool_use');
     assert.strictEqual(r.messages[0].content[0].name, 'get_weather');
     assert.strictEqual(r.messages[0].content[0].id, 'c1');
     assert.deepStrictEqual(r.messages[0].content[0].input, { city: 'NYC' });
+    assert.strictEqual(r.messages[1].role, 'user');
+    assert.strictEqual(r.messages[1].content[0].type, 'tool_result');
+    assert.strictEqual(r.messages[1].content[0].tool_use_id, 'c1');
 });
 
 test('buildAnthropicPayload: function_call with bad JSON arguments returns empty object', () => {
@@ -143,6 +147,73 @@ test('buildAnthropicPayload: max_output_tokens maps to max_tokens', () => {
 test('buildAnthropicPayload: temperature passed through', () => {
     const r = buildAnthropicPayload({ input: 'Hi', temperature: 0.7 }, 'claude-3');
     assert.strictEqual(r.temperature, 0.7);
+});
+
+test('buildAnthropicPayload: missing function_call_output gets synthetic tool_result', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { type: 'function_call', call_id: 'orphan_1', name: 'get_weather', arguments: '{}' }
+        ]
+    }, 'claude-3');
+    // assistant(tool_use) must be immediately followed by user(tool_result)
+    assert.strictEqual(r.messages.length, 2);
+    assert.strictEqual(r.messages[0].role, 'assistant');
+    assert.strictEqual(r.messages[0].content[0].type, 'tool_use');
+    assert.strictEqual(r.messages[1].role, 'user');
+    assert.strictEqual(r.messages[1].content[0].type, 'tool_result');
+    assert.strictEqual(r.messages[1].content[0].tool_use_id, 'orphan_1');
+});
+
+test('buildAnthropicPayload: multiple missing function_call_output each get synthetic tool_result', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { type: 'function_call', call_id: 'call_00', name: 'a', arguments: '{}' },
+            { type: 'function_call', call_id: 'call_01', name: 'b', arguments: '{}' }
+        ]
+    }, 'claude-3');
+    // Both tool_use live in the same assistant message; one user turn must hold both tool_results
+    assert.strictEqual(r.messages.length, 2);
+    assert.strictEqual(r.messages[0].content.length, 2);
+    assert.strictEqual(r.messages[1].role, 'user');
+    const resultIds = r.messages[1].content.map(b => b.tool_use_id).sort();
+    assert.deepStrictEqual(resultIds, ['call_00', 'call_01']);
+});
+
+test('buildAnthropicPayload: present function_call_output not duplicated, missing one still filled', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { type: 'function_call', call_id: 'present_1', name: 'a', arguments: '{}' },
+            { type: 'function_call', call_id: 'missing_1', name: 'b', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'present_1', output: 'real result' }
+        ]
+    }, 'claude-3');
+    assert.strictEqual(r.messages.length, 2);
+    assert.strictEqual(r.messages[0].role, 'assistant');
+    const results = r.messages[1].content;
+    const present = results.find(b => b.tool_use_id === 'present_1');
+    const missing = results.find(b => b.tool_use_id === 'missing_1');
+    assert.ok(present, 'present tool_result should exist');
+    assert.strictEqual(present.content, 'real result');
+    assert.ok(missing, 'missing tool_result should be synthesized');
+    assert.notStrictEqual(missing.content, 'real result');
+});
+
+test('buildAnthropicPayload: tool_use without result in later turn still gets synthetic tool_result', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'q1' }] },
+            { type: 'function_call', call_id: 'answered', name: 'a', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'answered', output: 'ok' },
+            { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'q2' }] },
+            { type: 'function_call', call_id: 'unanswered', name: 'b', arguments: '{}' }
+        ]
+    }, 'claude-3');
+    // The last assistant message has an unanswered tool_use -> must be followed by tool_result
+    const lastAssistant = [...r.messages].reverse().find(m => m.role === 'assistant');
+    const idx = r.messages.indexOf(lastAssistant);
+    const next = r.messages[idx + 1];
+    assert.ok(next && next.role === 'user', 'next message after unanswered tool_use must be user');
+    assert.ok(Array.isArray(next.content) && next.content.some(b => b.type === 'tool_result' && b.tool_use_id === 'unanswered'));
 });
 
 test('buildAnthropicPayload: tools converted to Anthropic format', () => {
