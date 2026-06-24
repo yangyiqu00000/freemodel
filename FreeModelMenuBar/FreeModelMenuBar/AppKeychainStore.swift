@@ -92,11 +92,11 @@ public struct AppKeychainStore {
     }
 }
 
-public enum AppKeychainError: Error, CustomStringConvertible {
+public enum AppKeychainError: Error, LocalizedError {
     case osStatus(OSStatus, String)
     case invalidInput
 
-    public var description: String {
+    public var errorDescription: String? {
         switch self {
         case .osStatus(let s, let op):
             let msg = SecCopyErrorMessageString(s, nil) as String? ?? "unknown"

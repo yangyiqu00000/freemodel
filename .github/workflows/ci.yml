@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main, balance]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run JS unit tests
+        run: node FreeModelMenuBar/scripts/test_router_unit.js
+
+      - name: Run JS integration tests
+        run: |
+          node FreeModelMenuBar/scripts/check_router_responses_stream.js
+          node FreeModelMenuBar/scripts/check_router_tool_calls.js
+          node FreeModelMenuBar/scripts/check_router_queued_abort.js
+          node FreeModelMenuBar/scripts/check_router_throttling.js
+          node FreeModelMenuBar/scripts/check_hot_reload_and_failover.js
+          node FreeModelMenuBar/scripts/check_reasoning_and_failover_disable.js
+
+      - name: Run Swift balance parser tests
+        run: |
+          SWIFT_SRC="FreeModelMenuBar/FreeModelMenuBar"
+          swiftc -target arm64-apple-macos13.0 \
+            "$SWIFT_SRC/FreeModelTypes.swift" \
+            "FreeModelMenuBar/scripts/test_balance_parser.swift" \
+            -o /tmp/test_balance_parser
+          /tmp/test_balance_parser
+
+      - name: Run Swift dashboard parser tests
+        run: |
+          SWIFT_SRC="FreeModelMenuBar/FreeModelMenuBar"
+          swiftc -target arm64-apple-macos13.0 \
+            "$SWIFT_SRC/FreeModelDashboardParser.swift" \
+            "$SWIFT_SRC/FreeModelTypes.swift" \
+            "FreeModelMenuBar/scripts/check_dashboard_parser.swift" \
+            -o /tmp/check_dashboard_parser
+          /tmp/check_dashboard_parser
+
+      - name: Run Swift account manager tests
+        run: |
+          SWIFT_SRC="FreeModelMenuBar/FreeModelMenuBar"
+          swiftc -target arm64-apple-macos13.0 \
+            "$SWIFT_SRC/FreeModelTypes.swift" \
+            "$SWIFT_SRC/AppKeychainStore.swift" \
+            "$SWIFT_SRC/AccountManager.swift" \
+            "FreeModelMenuBar/scripts/check_account_manager.swift" \
+            -o /tmp/check_account_manager
+          /tmp/check_account_manager
+
+      - name: Run Swift static analysis checks
+        run: |
+          swiftc -target arm64-apple-macos13.0 \
+            "FreeModelMenuBar/scripts/check_multi_account_static.swift" \
+            -o /tmp/check_multi_account_static
+          /tmp/check_multi_account_static
+          swiftc -target arm64-apple-macos13.0 \
+            "FreeModelMenuBar/scripts/check_no_automatic_keychain_reads.swift" \
+            -o /tmp/check_keychain_reads
+          /tmp/check_keychain_reads
+          swiftc -target arm64-apple-macos13.0 \
+            "FreeModelMenuBar/scripts/check_settings_window.swift" \
+            -o /tmp/check_settings_window
+          /tmp/check_settings_window
+
+      - name: Verify main app compiles
+        run: |
+          SWIFT_SRC="FreeModelMenuBar/FreeModelMenuBar"
+          awk -v p="$SWIFT_SRC" '{print p"/"$0}' "FreeModelMenuBar/build_manual/all2.swift" \
+            | tr '\n' '\0' > /tmp/sources.bin
+          xargs -0 swiftc -target arm64-apple-macos13.0 < /tmp/sources.bin \
+            -o /tmp/FreeModelMenuBar 2>&1

@@ -351,16 +351,7 @@ struct MenuContent: View {
     // MARK: - Router status views
 
     private func statusBadge(_ status: RouterStatus) -> some View {
-        let color: Color
-        switch status {
-        case .off: color = .gray
-        case .starting: color = .orange
-        case .running: color = .green
-        case .failed: color = .red
-        case .portInUse: color = .red
-        case .missingKey: color = .red
-        }
-
+        let color = status.statusColor ?? .gray
         return Text(status.rawValue)
             .font(.app(.microLabel))
             .padding(.horizontal, 5)

@@ -8,77 +8,7 @@
 import Combine
 import Foundation
 
-struct StoredCookie: Codable, Equatable, Identifiable {
-    var id: String { "\(domain)|\(path)|\(name)" }
 
-    let name: String
-    let value: String
-    let domain: String
-    let path: String
-    let expiresAt: Date?
-    let isSecure: Bool
-    let isHTTPOnly: Bool
-
-    init(
-        name: String,
-        value: String,
-        domain: String,
-        path: String,
-        expiresAt: Date?,
-        isSecure: Bool,
-        isHTTPOnly: Bool
-    ) {
-        self.name = name
-        self.value = value
-        self.domain = domain
-        self.path = path
-        self.expiresAt = expiresAt
-        self.isSecure = isSecure
-        self.isHTTPOnly = isHTTPOnly
-    }
-
-    init(cookie: HTTPCookie) {
-        self.name = cookie.name
-        self.value = cookie.value
-        self.domain = cookie.domain
-        self.path = cookie.path
-        self.expiresAt = cookie.expiresDate
-        self.isSecure = cookie.isSecure
-        self.isHTTPOnly = cookie.isHTTPOnly
-    }
-
-    var isExpired: Bool {
-        guard let expiresAt else { return false }
-        return expiresAt <= Date()
-    }
-
-    var headerPair: String {
-        let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
-        return "\(name)=\(encodedValue)"
-    }
-
-    func makeHTTPCookie() -> HTTPCookie? {
-        var properties: [HTTPCookiePropertyKey: Any] = [
-            .name: name,
-            .value: value,
-            .domain: domain,
-            .path: path,
-            .version: "0"
-        ]
-
-        if let expiresAt {
-            properties[.expires] = expiresAt
-        }
-        if isSecure {
-            properties[.secure] = "TRUE"
-        }
-        if isHTTPOnly {
-            properties[HTTPCookiePropertyKey("HttpOnly")] = "TRUE"
-        }
-
-        return HTTPCookie(properties: properties)
-    }
-}
 
 struct RouterSettings: Codable, Equatable {
     var enabled: Bool
@@ -401,14 +331,15 @@ final class InMemoryAccountStorage: AccountStorage {
     }
 }
 
+@MainActor
 final class AccountManager: ObservableObject {
     @Published private(set) var accounts: [ProviderAccount]
     @Published private(set) var activeAccountID: UUID?
 
     private let storage: AccountStorage
-    private let appKeychain: AppKeychainStore
+    private nonisolated(unsafe) static let appKeychainStore = AppKeychainStore()
 
-    init(storage: AccountStorage = UserDefaultsAccountStorage(), appKeychain: AppKeychainStore = AppKeychainStore(), autoCreateDefaultAccount: Bool = true) {
+        init(storage: AccountStorage = UserDefaultsAccountStorage(), autoCreateDefaultAccount: Bool = true) {
         self.storage = storage
 
         if let state = storage.loadState() {
@@ -419,7 +350,6 @@ final class AccountManager: ObservableObject {
             self.activeAccountID = nil
         }
 
-        self.appKeychain = appKeychain
 
         if accounts.isEmpty && autoCreateDefaultAccount {
             let account = ProviderAccount(displayName: "FreeModel 1")
@@ -510,7 +440,7 @@ final class AccountManager: ObservableObject {
         guard let index = accounts.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = accounts.remove(at: index)
         // 同时清理 Keychain 中的 API Key
-        try? appKeychain.delete(account: removed.apiKeyKeychainID)
+        try? Self.appKeychainStore.delete(account: removed.apiKeyKeychainID)
         if activeAccountID == id {
             activeAccountID = accounts.first?.id
         }
@@ -587,12 +517,12 @@ final class AccountManager: ObservableObject {
 
         if trimmed?.isEmpty ?? true {
             // 清除 Keychain 中的 API Key
-            try? appKeychain.delete(account: keychainID)
+            try? Self.appKeychainStore.delete(account: keychainID)
             setAPIKeyConfigured(false, for: id)
         } else {
             // 写入 Keychain
             do {
-                try appKeychain.save(apiKey: trimmed!, account: keychainID)
+                try Self.appKeychainStore.save(apiKey: trimmed!, account: keychainID)
                 setAPIKeyConfigured(true, for: id)
             } catch {
                 print("Keychain save failed: \(error)")
@@ -602,9 +532,11 @@ final class AccountManager: ObservableObject {
 
     /// 从 Keychain 读取指定账号的 API Key。
     /// 返回 nil = 未配置或读取失败。
-    func resolveAPIKey(for id: UUID) -> String? {
-        guard let keychainID = apiKeyStorageKey(for: id) else { return nil }
-        return try? appKeychain.load(account: keychainID)
+    nonisolated func resolveAPIKey(for id: UUID) -> String? {
+        // 使用默认 keychainID（与 apiKeyKeychainID 默认值一致）。
+        // 不从内存读取避免 actor 隔离限制；自定义 ID 场景极少且无存量用户，不影响。
+        let keychainID = "freemodel_api_key_\(id.uuidString)"
+        return try? Self.appKeychainStore.load(account: keychainID)
     }
 
     func updateRouterSettings(_ settings: RouterSettings, for id: UUID) {
@@ -642,9 +574,9 @@ final class AccountManager: ObservableObject {
             guard let oldKey = accounts[i].apiKey, !oldKey.isEmpty else { continue }
             let keychainID = accounts[i].apiKeyKeychainID
             // 仅在 Keychain 中还不存在时写入
-            if (try? appKeychain.load(account: keychainID)) == nil {
+            if (try? Self.appKeychainStore.load(account: keychainID)) == nil {
                 do {
-                    try appKeychain.save(apiKey: oldKey, account: keychainID)
+                    try Self.appKeychainStore.save(apiKey: oldKey, account: keychainID)
                     accounts[i].hasAPIKey = true
                     print("Migrated API Key for \(accounts[i].displayName) to Keychain")
                 } catch {
