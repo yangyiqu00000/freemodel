@@ -15,7 +15,7 @@
 [![Release](https://img.shields.io/github/v/release/yangyiqu00000/freemodel)](https://github.com/yangyiqu00000/freemodel/releases)
 [![Stars](https://img.shields.io/github/stars/yangyiqu00000/freemodel?style=social)](https://github.com/yangyiqu00000/freemodel)
 
-[⬇️ Download v0.0.2](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
+[⬇️ Download v0.0.3](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 Report a bug](https://github.com/yangyiqu00000/freemodel/issues)
 
 </div>
 
@@ -143,8 +143,8 @@ After step 5, you'll never touch `config.toml` again.
 
 ### Option A: Grab the DMG (recommended)
 
-1. Head to [**Releases → v0.0.2**](https://github.com/yangyiqu00000/freemodel/releases/latest)
-2. Download `FreeModelMenuBar-0.0.2.dmg`
+1. Head to [**Releases → v0.0.3**](https://github.com/yangyiqu00000/freemodel/releases/latest)
+2. Download `FreeModelMenuBar-0.0.3.dmg`
 3. Open it, drag the app into `/Applications`
 4. Launch it — look for 💲 in your menu bar
 
@@ -257,6 +257,15 @@ Already shipped:
 - [x] **Protocol auto-detection** — router detects upstream protocol from
       URL suffix (`/v1/messages` → Anthropic, `/v1/chat/completions` → Chat)
 - [x] **Settings sidebar drag-and-drop** — reorder account cards intuitively
+- [x] **v0.0.3: Router refactoring & hardening**
+  - Protocol adapter registry (`registerProtocol`) — add a protocol in one function call
+  - 55 unit tests for router pure functions (<1s, zero HTTP)
+  - `require()` side-effect free — no server start on `require('./router_sidecar')`
+  - Global state decoupling in `repairToolCallMessageOrder`
+  - All hardcoded constants → `CONFIG` object, env-overridable via `PROXY_*` vars
+  - Stream inactivity timeout (60s default, `PROXY_STREAM_TIMEOUT_MS`)
+  - `reasoning_content` preserved across tool-call turns
+  - Anthropic `tool_use` → `tool_result` adjacency enforced (synthetic missing results)
 
 Coming next:
 

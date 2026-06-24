@@ -14,7 +14,7 @@
 [![Release](https://img.shields.io/github/v/release/yangyiqu00000/freemodel)](https://github.com/yangyiqu00000/freemodel/releases)
 [![Stars](https://img.shields.io/github/stars/yangyiqu00000/freemodel?style=social)](https://github.com/yangyiqu00000/freemodel)
 
-[⬇️ 下载 v0.0.2](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 反馈问题](https://github.com/yangyiqu00000/freemodel/issues)
+[⬇️ 下载 v0.0.3](https://github.com/yangyiqu00000/freemodel/releases/latest) · [🐛 反馈问题](https://github.com/yangyiqu00000/freemodel/issues)
 
 </div>
 
@@ -127,8 +127,8 @@ base_url = "http://127.0.0.1:7842/v1"
 
 ### 方式 A:下载 DMG(推荐)
 
-1. 前往 [**Releases → v0.0.2**](https://github.com/yangyiqu00000/freemodel/releases/latest)
-2. 下载 `FreeModelMenuBar-0.0.2.dmg`
+1. 前往 [**Releases → v0.0.3**](https://github.com/yangyiqu00000/freemodel/releases/latest)
+2. 下载 `FreeModelMenuBar-0.0.3.dmg`
 3. 打开,把 app 拖进 `/Applications`
 4. 启动 — 菜单栏里找 💲
 
@@ -222,6 +222,15 @@ FreeModelMenuBar/
 - [x] **协议自动检测** — 路由根据 URL 后缀自动识别上游协议
       (`/v1/messages` → Anthropic, `/v1/chat/completions` → Chat)
 - [x] **设置页拖拽排序** — 账号卡片支持拖拽调整顺序
+- [x] **v0.0.3: 路由重构与加固**
+  - 协议适配器注册制(`registerProtocol`) — 一行代码注册新协议
+  - 55 个路由纯函数单元测试(<1s,零 HTTP)
+  - `require()` 无副作用 — `require('./router_sidecar')` 不再启动服务器
+  - `repairToolCallMessageOrder` 全局状态解耦
+  - 所有魔数 → `CONFIG` 对象,可通过 `PROXY_*` 环境变量覆盖
+  - 流式无数据超时(默认 60s,`PROXY_STREAM_TIMEOUT_MS`)
+  - `reasoning_content` 跨轮保留
+  - Anthropic `tool_use` → `tool_result` 邻接强制执行(合成缺失结果)
 
 接下来:
 
