@@ -54,13 +54,3 @@ struct FreeModelMenuBarApp: App {
     }
 }
 
-private extension View {
-    @ViewBuilder
-    func loadingPulse(isActive: Bool) -> some View {
-        if #available(macOS 14.0, *) {
-            self.symbolEffect(.pulse, options: .repeating, isActive: isActive)
-        } else {
-            self
-        }
-    }
-}

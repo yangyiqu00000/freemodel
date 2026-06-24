@@ -67,6 +67,7 @@ struct RouterLogEntry: Identifiable, Codable, Equatable {
     }
 }
 
+@MainActor
 final class RouterManager: ObservableObject {
     // 日志数组最大保留条数。UI（LogsConsoleView「最近 N 条」文案）和截断逻辑共用同一来源
     static let maxLogCount: Int = 50
@@ -109,7 +110,9 @@ final class RouterManager: ObservableObject {
     }
 
     deinit {
-        stopProxy()
+        // deinit 不能是 @MainActor，直接停止进程（非isolated 安全操作）
+        runningProcess?.terminate()
+        runningProcess = nil
     }
 
     /// Sync proxy lifecycle with active account settings
@@ -298,7 +301,9 @@ final class RouterManager: ObservableObject {
             let data = handle.availableData
             guard !data.isEmpty else { return }
             if let output = String(data: data, encoding: .utf8) {
-                self?.handleProxyOutput(output)
+                Task { @MainActor [weak self] in
+                    self?.handleProxyOutput(output)
+                }
             }
         }
 
@@ -306,12 +311,14 @@ final class RouterManager: ObservableObject {
             let data = handle.availableData
             guard !data.isEmpty else { return }
             if let error = String(data: data, encoding: .utf8) {
-                self?.handleProxyError(error)
+                Task { @MainActor [weak self] in
+                    self?.handleProxyError(error)
+                }
             }
         }
 
         process.terminationHandler = { [weak self] _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.appendLog("路由代理侧车进程已退出。")
                 if self?.status.isBusy == true {
                     self?.status = .failed
@@ -352,7 +359,7 @@ final class RouterManager: ObservableObject {
         if process.isRunning {
             isStopping = true
             process.terminationHandler = { [weak self] _ in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self?.appendLog("路由代理侧车进程已退出。")
                     self?.runningProcess = nil
                     self?.runningInputPipe = nil
@@ -447,11 +454,11 @@ final class RouterManager: ObservableObject {
 
         URLSession.shared.dataTask(with: request) { _, response, _ in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     completion(true)
                 }
             } else {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     completion(false)
                 }
             }
@@ -459,7 +466,7 @@ final class RouterManager: ObservableObject {
     }
 
     private func handleProxyOutput(_ text: String) {
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self = self else { return }
             self.outputBuffer += text
             let lines = self.outputBuffer.components(separatedBy: "\n")
@@ -499,7 +506,7 @@ final class RouterManager: ObservableObject {
     }
 
     private func handleProxyError(_ text: String) {
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self = self else { return }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return }

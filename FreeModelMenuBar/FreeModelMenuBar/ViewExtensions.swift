@@ -222,3 +222,16 @@ func scheduleToastDismiss<T: Equatable>(
         withAnimation { binding.wrappedValue = nil }
     }
 }
+
+
+extension View {
+    /// 菜单栏图标加载脉冲动画（macOS 14+ 使用 symbolEffect，旧版本降级无动画）
+    @ViewBuilder
+    func loadingPulse(isActive: Bool) -> some View {
+        if #available(macOS 14.0, *) {
+            self.symbolEffect(.pulse, options: .repeating, isActive: isActive)
+        } else {
+            self
+        }
+    }
+}
