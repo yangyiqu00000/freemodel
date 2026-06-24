@@ -132,7 +132,7 @@ function requestJSON(options, body) {
     env: {
       ...process.env,
       PORT: String(proxyPort),
-      UPSTREAM_BASE_URL: `http://127.0.0.1:${port1}`,
+      UPSTREAM_BASE_URL: `http://127.0.0.1:${port1}/chat/completions`,
       UPSTREAM_API_KEY: 'temp-key',
       UPSTREAM_MODEL: 'initial-model',
       ROUTE_MODEL: 'codex-mini',
@@ -174,14 +174,14 @@ function requestJSON(options, body) {
       type: "update_config",
       activeAccount: {
         providerID: "primary-unhealthy",
-        url: `http://127.0.0.1:${port1}`,
+        url: `http://127.0.0.1:${port1}/chat/completions`,
         key: "primary-key",
         model: "deepseek-chat"
       },
       backups: [
         {
           providerID: "backup-healthy",
-          url: `http://127.0.0.1:${port2}`,
+          url: `http://127.0.0.1:${port2}/chat/completions`,
           key: "backup-key",
           model: "backup-model"
         }

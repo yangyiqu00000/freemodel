@@ -1150,14 +1150,7 @@ registerProtocol('chat', {
         };
         if (!isReasoning) delete requestPayload.reasoning_effort;
         if (Array.isArray(chatPayload.messages)) {
-            requestPayload.messages = chatPayload.messages.map(m => {
-                if (m.role === 'assistant' && m.reasoning_content !== undefined) {
-                    const newMsg = { ...m };
-                    if (!isReasoning) delete newMsg.reasoning_content;
-                    return newMsg;
-                }
-                return m;
-            });
+            requestPayload.messages = chatPayload.messages;
         }
         return {
             headers: { 'Authorization': 'Bearer ' + (candidate.key || '') },
