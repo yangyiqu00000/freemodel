@@ -216,6 +216,25 @@ test('buildAnthropicPayload: tool_use without result in later turn still gets sy
     assert.ok(Array.isArray(next.content) && next.content.some(b => b.type === 'tool_result' && b.tool_use_id === 'unanswered'));
 });
 
+test('buildAnthropicPayload: tool_use followed by user text absorbs synthetic tool_result into same message', () => {
+    const r = buildAnthropicPayload({
+        input: [
+            { type: 'function_call', call_id: 'call_abc', name: 'get_weather', arguments: '{}' },
+            { role: 'user', content: 'continue' }
+        ]
+    }, 'claude-3');
+    // Anthropic requires tool_result immediately after tool_use — must be in the SAME user message
+    assert.strictEqual(r.messages.length, 2, 'must have exactly assistant + user');
+    assert.strictEqual(r.messages[0].role, 'assistant');
+    assert.strictEqual(r.messages[0].content[0].type, 'tool_use');
+    assert.strictEqual(r.messages[1].role, 'user');
+    const types = r.messages[1].content.map(c => c.type);
+    assert.ok(types.includes('tool_result'), 'user message must include tool_result');
+    assert.ok(types.includes('text'), 'user message must include the text');
+    const synthetic = r.messages[1].content.find(c => c.type === 'tool_result');
+    assert.strictEqual(synthetic.tool_use_id, 'call_abc');
+});
+
 test('buildAnthropicPayload: tools converted to Anthropic format', () => {
     const r = buildAnthropicPayload({
         input: 'Hi',

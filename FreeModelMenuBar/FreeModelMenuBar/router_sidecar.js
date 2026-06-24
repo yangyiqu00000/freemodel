@@ -554,7 +554,7 @@ function buildAnthropicPayload(reqBody, modelName) {
         content.push(...currentTools);
         content.push(...currentResults);
 
-        if (currentRole === 'user' && currentResults.length && pendingToolUseIds.length) {
+        if (currentRole === 'user' && pendingToolUseIds.length) {
             // Anthropic requires every tool_use from the previous assistant turn to have a
             // tool_result in the immediately following user message. Absorb any still-unanswered
             // ids into this same user message so they stay adjacent.
