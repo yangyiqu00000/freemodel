@@ -95,6 +95,10 @@ public final class AppLayer: ObservableObject {
     private let injectionStore: InjectionConfigStore
     private let codexHome: URL
 
+    // MARK: - 文件同步（激活后内核事件驱动）
+    private var syncSourceConfig: DispatchSourceFileSystemObject?
+    private var syncSourceAuth: DispatchSourceFileSystemObject?
+
     @Published public private(set) var authState: AuthLayer.State = AuthLayer.State()
     @Published public private(set) var providerCatalog: ProviderCatalogStore.Catalog = ProviderCatalogStore.Catalog()
     @Published public private(set) var configSnapshot: ConfigLayer.Snapshot = ConfigLayer.Snapshot()
@@ -273,6 +277,7 @@ public final class AppLayer: ObservableObject {
             Task { await refresh() }
             lastSuccessMessage = "已激活：\(cfg.label)"
             lastError = nil
+            startSyncWatching()
         } catch {
             lastError = "激活失败：\(error)"
         }
@@ -282,6 +287,7 @@ public final class AppLayer: ObservableObject {
     /// 任何持久化的 activeInjection 也清掉，避免出现"UI 已激活但本地不存在"的不一致。
     public func deactivate() {
         do {
+            stopSyncWatching()
             try deleteCodexStateFiles()
             activeInjection = nil
             persistInjectionState()
@@ -352,6 +358,77 @@ public final class AppLayer: ObservableObject {
     public func clearMessages() {
         lastError = nil
         lastSuccessMessage = nil
+    }
+
+
+    // MARK: - 文件同步（激活后内核事件驱动）
+
+    /// 启动对 config.toml 和 auth.json 的文件监听。
+    /// 事件驱动（DispatchSourceFileSystemObject），零轮询零 CPU 闲置消耗。
+    /// 任何外部进程（Codex CLI 等）写入文件后，变更自动同步回当前激活的 snapshot。
+    private func startSyncWatching() {
+        stopSyncWatching()
+
+        let configURL = codexHome.appendingPathComponent("config.toml")
+        let authURL = codexHome.appendingPathComponent("auth.json")
+
+        syncSourceConfig = startWatchingFile(at: configURL) { [weak self] in
+            Task { [weak self] in await self?.syncFileFromDisk(url: configURL, isAuth: false) }
+        }
+        syncSourceAuth = startWatchingFile(at: authURL) { [weak self] in
+            Task { [weak self] in await self?.syncFileFromDisk(url: authURL, isAuth: true) }
+        }
+    }
+
+    /// 停止所有文件监听。
+    private func stopSyncWatching() {
+        syncSourceConfig?.cancel()
+        syncSourceConfig = nil
+        syncSourceAuth?.cancel()
+        syncSourceAuth = nil
+    }
+
+    /// 为指定路径创建 DispatchSource 文件监听。
+    /// 同时监听 write/extend（直接写入）和 rename/delete（原子写入 temp→rename）。
+    /// 原子写入场景下，rename 后旧 fd 失效，但同步逻辑仍能通过 path-based 读取新文件。
+    private func startWatchingFile(at url: URL, onChange: @escaping @Sendable () -> Void) -> DispatchSourceFileSystemObject? {
+        let fd = open(url.path, O_EVTONLY)
+        guard fd >= 0 else { return nil }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .rename, .delete],
+            queue: DispatchQueue.global(qos: .utility)
+        )
+        src.setEventHandler { onChange() }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        return src
+    }
+
+    /// 从磁盘读取文件内容，如与当前激活 snapshot 不同则更新。
+    /// 从全局队列调用，通过 Task @MainActor 安全写入 @Published 属性。
+    private func syncFileFromDisk(url: URL, isAuth: Bool) {
+        guard let newContent = try? String(contentsOf: url, encoding: .utf8) else { return }
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let active = self.activeInjection,
+                  let idx = self.injectionConfigurations.firstIndex(where: { $0.id == active.configurationID })
+            else { return }
+
+            let current = isAuth
+                ? self.injectionConfigurations[idx].authJSON
+                : self.injectionConfigurations[idx].configTOML
+
+            if newContent != current {
+                if isAuth {
+                    self.injectionConfigurations[idx].authJSON = newContent
+                } else {
+                    self.injectionConfigurations[idx].configTOML = newContent
+                }
+                self.injectionConfigurations[idx].updatedAt = Date()
+                self.persistInjectionState()
+            }
+        }
     }
 
     // MARK: - 私有辅助

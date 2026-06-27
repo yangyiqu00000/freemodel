@@ -331,6 +331,39 @@ final class InMemoryAccountStorage: AccountStorage {
     }
 }
 
+/// 线程安全的 API Key 内存缓存。
+/// 避免 session 内重复触发 Keychain 弹窗（macOS 每次 SecItemCopyMatching 走 ACL 验证）。
+private final class _APICache: @unchecked Sendable {
+    private var storage: [String: String] = [:]
+    private let lock = NSLock()
+    func value(for key: String) -> String? { lock.withLock { storage[key] } }
+    func set(_ value: String, for key: String) { lock.withLock { storage[key] = value } }
+    @discardableResult
+    func removeValue(for key: String) -> String? { lock.withLock { storage.removeValue(forKey: key) } }
+    func clear() { lock.withLock { storage.removeAll() } }
+}
+
+/// 线程安全的布尔值（用于懒迁移的 once 语义）。
+private final class AtomicBool: @unchecked Sendable {
+    private var _value: Bool = false
+    private let lock = NSLock()
+    var value: Bool {
+        get { lock.withLock { _value } }
+        set { lock.withLock { _value = newValue } }
+    }
+}
+
+/// 旧版账号状态（含明文 apiKey），用于离线迁移。
+private struct _LegacyAccount: Codable {
+    var id: UUID
+    var apiKey: String?
+}
+
+private struct _LegacyAccountState: Codable {
+    var accounts: [_LegacyAccount]
+}
+
+
 @MainActor
 final class AccountManager: ObservableObject {
     @Published private(set) var accounts: [ProviderAccount]
@@ -338,6 +371,10 @@ final class AccountManager: ObservableObject {
 
     private let storage: AccountStorage
     private nonisolated(unsafe) static let appKeychainStore = AppKeychainStore()
+    /// API Key 内存缓存（session 级），避免重复触发 Keychain 弹窗。
+    private var apiKeyCache: [String: String] = [:]
+    /// 标记旧数据迁移是否已完成。
+    private var didMigrateAPIKeys = false
 
         init(storage: AccountStorage = UserDefaultsAccountStorage(), autoCreateDefaultAccount: Bool = true) {
         self.storage = storage
@@ -532,11 +569,71 @@ final class AccountManager: ObservableObject {
 
     /// 从 Keychain 读取指定账号的 API Key。
     /// 返回 nil = 未配置或读取失败。
+    /// 设计要点：
+    ///   - 内存缓存（apiKeyCache）避免 session 内重复触发 Keychain 弹窗
+    ///   - 懒迁移确保旧版 UserDefaults 数据也被迁移
+    ///   - 非 isolated，允许 RouterManager（非 MainActor）直接调用
     nonisolated func resolveAPIKey(for id: UUID) -> String? {
-        // 使用默认 keychainID（与 apiKeyKeychainID 默认值一致）。
-        // 不从内存读取避免 actor 隔离限制；自定义 ID 场景极少且无存量用户，不影响。
         let keychainID = "freemodel_api_key_\(id.uuidString)"
-        return try? Self.appKeychainStore.load(account: keychainID)
+
+        // 1. 查缓存
+        if let cached = Self._apiKeyCache.value(for: keychainID) {
+            return cached
+        }
+
+        // 2. 懒迁移（仅首次触发）
+        Self._ensureMigrated()
+
+        // 3. 读 Keychain
+        guard let key = try? Self.appKeychainStore.load(account: keychainID) else {
+            return nil
+        }
+
+        // 4. 写缓存
+        Self._apiKeyCache.set(key, for: keychainID)
+        return key
+    }
+
+    // MARK: - API Key 内存缓存
+    private nonisolated(unsafe) static let _apiKeyCache: _APICache = _APICache()
+    private nonisolated(unsafe) static let _lazyMigrated: AtomicBool = AtomicBool()
+
+    /// 懒迁移触发器：仅在首次调用 resolveAPIKey 时执行一次。
+    /// 通过 dispatch_once 语义 + MainActor 异步执行，避免 init 时触 Keychain 弹窗。
+    private nonisolated static func _ensureMigrated() {
+        guard !_lazyMigrated.value else { return }
+        _lazyMigrated.value = true
+        DispatchQueue.main.async {
+            // 通过共享实例（ObjectIdentifier 定位）触发迁移
+            _migrateIfNeeded()
+        }
+    }
+
+    /// 查找 AccountManager 实例并执行迁移。
+    /// 不使用 @MainActor 约束，由 DispatchQueue.main.async 保证在主线程执行。
+    private nonisolated static func _migrateIfNeeded() {
+        // AccountManager 是 @MainActor 类，无法直接持有静态引用。
+        // 通过 Objective-C runtime 或 Published 订阅查找不现实。
+        // 简单方案：迁移逻辑只读 UserDefaults，不依赖实例状态。
+        // 如果有旧数据，直接迁移；没有则跳过。
+        _legacyDirectMigrate()
+    }
+
+    /// 直接读取 UserDefaults 旧数据并迁移到 Keychain（不依赖 AccountManager 实例）。
+    /// 兼容旧版存储格式：accounts 数组中的 apiKey 字段。
+    private nonisolated static func _legacyDirectMigrate() {
+        let defaults = UserDefaults.standard
+        guard let data = defaults.data(forKey: "freemodel.accounts.state.v1"),
+              let state = try? JSONDecoder().decode(_LegacyAccountState.self, from: data)
+        else { return }
+
+        let store = AppKeychainStore()
+        for acct in state.accounts {
+            guard let key = acct.apiKey, !key.isEmpty else { continue }
+            let keychainID = "freemodel_api_key_\(acct.id.uuidString)"
+            guard (try? store.load(account: keychainID)) == nil else { continue }
+            try? store.save(apiKey: key, account: keychainID)
+        }
     }
 
     func updateRouterSettings(_ settings: RouterSettings, for id: UUID) {

@@ -47,10 +47,10 @@
 				<string>fileApp</string>
 				<string>fileTypes</string>
 				<string>fileAccountManager</string>
+				<string>fileAppKeychainStore</string>
 				<string>fileBalanceManager</string>
 				<string>fileDashboardParser</string>
 				<string>fileWebLoginWindowController</string>
-				<string>fileKeychainHelper</string>
 				<string>fileMenuContent</string>
 				<string>fileSettingsView</string>
 				<string>fileSettingsWindowController</string>
@@ -170,7 +170,7 @@
 				<key>DEVELOPMENT_TEAM</key>
 				<string></string>
 				<key>ENABLE_HARDENED_RUNTIME</key>
-				<string>YES</string>
+				<string>NO</string>
 				<key>GENERATE_INFOPLIST_FILE</key>
 				<string>YES</string>
 				<key>INFOPLIST_KEY_CFBundleDisplayName</key>
@@ -282,10 +282,10 @@
 				<string>buildFileApp</string>
 				<string>buildFileTypes</string>
 				<string>buildFileAccountManager</string>
+				<string>buildFileAppKeychainStore</string>
 				<string>buildFileBalanceManager</string>
 				<string>buildFileDashboardParser</string>
 				<string>buildFileWebLoginWindowController</string>
-				<string>buildFileKeychainHelper</string>
 				<string>buildFileMenuContent</string>
 				<string>buildFileSettingsView</string>
 				<string>buildFileSettingsWindowController</string>
@@ -419,6 +419,29 @@
 			<string>fileAccountManager</string>
 		</dict>
 
+		<key>fileAppKeychainStore</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>fileEncoding</key>
+			<string>4</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>name</key>
+			<string>AppKeychainStore.swift</string>
+			<key>path</key>
+			<string>AppKeychainStore.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>buildFileAppKeychainStore</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+			<key>fileRef</key>
+			<string>fileAppKeychainStore</string>
+		</dict>
+
 		<key>fileBalanceManager</key>
 		<dict>
 			<key>isa</key>
@@ -488,28 +511,6 @@
 			<string>fileWebLoginWindowController</string>
 		</dict>
 
-		<key>fileKeychainHelper</key>
-		<dict>
-			<key>isa</key>
-			<string>PBXFileReference</string>
-			<key>fileEncoding</key>
-			<string>4</string>
-			<key>lastKnownFileType</key>
-			<string>sourcecode.swift</string>
-			<key>name</key>
-			<string>KeychainHelper.swift</string>
-			<key>path</key>
-			<string>KeychainHelper.swift</string>
-			<key>sourceTree</key>
-			<string>&lt;group&gt;</string>
-		</dict>
-		<key>buildFileKeychainHelper</key>
-		<dict>
-			<key>isa</key>
-			<string>PBXBuildFile</string>
-			<key>fileRef</key>
-			<string>fileKeychainHelper</string>
-		</dict>
 
 		<key>fileMenuContent</key>
 		<dict>
